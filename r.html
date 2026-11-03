@@ -3,25 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting...</title>
+    <title>Redirecting... | The QR Code Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
-    <div id="statusBox" class="text-center space-y-2">
-        <div class="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>
-        <p id="statusText" class="text-sm text-slate-300 font-medium">Redirecting to destination...</p>
+<body class="bg-[#1b1b1f] text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Loading / Status Card -->
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center shadow-2xl space-y-4">
+        
+        <!-- Brand Header -->
+        <div class="flex items-center justify-center gap-2 mb-2">
+            <div class="grid grid-cols-2 gap-0.5 w-5 h-5">
+                <span class="bg-red-500 rounded-xs"></span>
+                <span class="bg-white rounded-xs"></span>
+                <span class="bg-white rounded-xs"></span>
+                <span class="bg-emerald-500 rounded-xs"></span>
+            </div>
+            <span class="font-extrabold text-xs tracking-tight text-white">THE QR CODE GENERATOR</span>
+        </div>
+
+        <!-- Spinner Icon -->
+        <div id="spinnerBox" class="flex justify-center py-2">
+            <div class="animate-spin w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
+        </div>
+
+        <!-- Status Message -->
+        <h1 id="statusTitle" class="text-base font-bold text-white">Connecting to destination...</h1>
+        <p id="statusSub" class="text-xs text-slate-400">Fast & secure dynamic QR redirection</p>
+
+        <!-- Action Button (Hidden unless paused/error) -->
+        <div id="actionBox" class="hidden pt-2">
+            <a href="./index.html" class="inline-block w-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold py-2.5 px-4 rounded-lg transition">
+                Create Your Own Dynamic QR Code
+            </a>
+        </div>
     </div>
 
     <script type="module">
         import { db, doc, getDoc, updateDoc, increment, serverTimestamp } from "./firebase-config.js";
 
-        async function processRedirect() {
+        // 1. Detect Scanner Device Type for Analytics
+        function detectDevice() {
+            const ua = navigator.userAgent || "";
+            if (/android/i.test(ua)) return "Android";
+            if (/iphone|ipad|ipod/i.test(ua)) return "iPhone";
+            return "Desktop";
+        }
+
+        // 2. Detect Time of Day Slot for Analytics
+        function detectTimeSlot() {
+            const hour = new Date().getHours();
+            if (hour >= 5 && hour < 12) return "Morning";
+            if (hour >= 12 && hour < 17) return "Afternoon";
+            if (hour >= 17 && hour < 21) return "Evening";
+            return "Night";
+        }
+
+        function showErrorState(title, subtitle) {
+            document.getElementById("spinnerBox").classList.add("hidden");
+            document.getElementById("statusTitle").textContent = title;
+            document.getElementById("statusSub").textContent = subtitle;
+            document.getElementById("actionBox").classList.remove("hidden");
+        }
+
+        async function handleScanRedirect() {
             const params = new URLSearchParams(window.location.search);
             const shortId = params.get("id");
-            const statusText = document.getElementById("statusText");
 
             if (!shortId) {
-                statusText.textContent = "Invalid QR Link!";
+                showErrorState("⚠️ Invalid QR Code Link", "Is QR link me koi valid ID nahi mili.");
                 return;
             }
 
@@ -30,38 +84,50 @@
                 const qrSnap = await getDoc(qrRef);
 
                 if (!qrSnap.exists()) {
-                    statusText.textContent = "QR Code not found or deleted!";
+                    showErrorState("❌ QR Code Not Found", "Yeh Dynamic QR code delete ho chuka hai ya exist nahi karta.");
                     return;
                 }
 
                 const data = qrSnap.data();
 
+                // Check if paused by Customer or Master Admin
                 if (!data.active) {
-                    statusText.textContent = "⚠️ This QR Code link has been paused by the owner or admin.";
+                    showErrorState("⏸️ QR Code Paused", "Is QR Code ke owner ne filhal is link ko rok (pause) rakha hai.");
                     return;
                 }
 
-                // Scan Count +1 update karein
-                await updateDoc(qrRef, {
-                    scans: increment(1),
-                    lastScannedAt: serverTimestamp()
-                });
+                const device = detectDevice();
+                const timeSlot = detectTimeSlot();
 
-                // Agar URL me http/https nahi hai toh laga dein
-                let target = data.targetUrl;
-                if (!/^https?:\/\//i.test(target)) {
+                // Update Scan Count + Device + Time of Day in Firestore (Matches Anti-Hacker Rules)
+                try {
+                    await updateDoc(qrRef, {
+                        scans: increment(1),
+                        lastScannedAt: serverTimestamp(),
+                        [`analytics.devices.${device}`]: increment(1),
+                        [`analytics.timeOfDay.${timeSlot}`]: increment(1)
+                    });
+                } catch (analyticErr) {
+                    // Agar network slow ho tab bhi redirect na ruke
+                    console.warn("Analytics update skipped:", analyticErr);
+                }
+
+                // Format Destination URL Safely
+                let target = (data.targetUrl || "").trim();
+                const isSpecialProtocol = /^(https?:\/\/|tel:|mailto:|upi:\/\/|WIFI:)/i.test(target);
+                if (!isSpecialProtocol) {
                     target = "https://" + target;
                 }
 
-                // window.location.replace use kiya hai taaki Back button dabane par redirect loop na bane
+                // Redirect without keeping r.html in browser back-button history
                 window.location.replace(target);
 
             } catch (err) {
-                statusText.textContent = "Error loading link: " + err.message;
+                showErrorState("⚠️ Connection Error", "Link open karne me samasya aayi: " + err.message);
             }
         }
 
-        processRedirect();
+        handleScanRedirect();
     </script>
 </body>
 </html>
