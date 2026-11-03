@@ -3,174 +3,570 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart QR Pro - Static & Dynamic Generator</title>
+    <title>The QR Code Generator - Free Dynamic QR & Analytics</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- QRious Library for Fast Canvas QR Generation -->
+    <!-- QRious Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen pb-20">
+<body class="bg-[#f8faf9] text-slate-900 min-h-screen flex flex-col">
 
-    <!-- Top Navbar -->
-    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <a href="#home" class="text-xl font-bold tracking-tight flex items-center gap-2">
-                <span>⚡ SmartQR</span>
-            </a>
-            <div class="flex items-center gap-3">
-                <button id="loginBtn" class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-semibold shadow hover:bg-indigo-50">
-                    Login
-                </button>
-                <div id="userInfo" class="hidden items-center gap-2">
-                    <span id="userName" class="text-xs font-medium bg-indigo-700 px-2 py-1 rounded"></span>
-                    <button id="logoutBtn" class="text-xs bg-red-500 px-2.5 py-1 rounded font-semibold">Exit</button>
+    <!-- ================= TOP NAVBAR (Like Screenshot 4 & 9) ================= -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+            <!-- Brand Logo -->
+            <a href="#home" class="flex items-center gap-2">
+                <div class="grid grid-cols-2 gap-0.5 w-6 h-6">
+                    <span class="bg-red-500 rounded-xs"></span>
+                    <span class="bg-slate-900 rounded-xs"></span>
+                    <span class="bg-slate-900 rounded-xs"></span>
+                    <span class="bg-emerald-600 rounded-xs"></span>
                 </div>
+                <div class="leading-none font-extrabold text-xs tracking-tight text-slate-900">
+                    THE QR CODE<br><span class="text-emerald-700">GENERATOR</span>
+                </div>
+            </a>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-2.5">
+                <button id="topSignupBtn" onclick="openAuthModal('signup')" class="bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold px-3.5 py-2 rounded-md shadow-xs transition">
+                    Sign up free
+                </button>
+                <div id="topUserBadge" class="hidden items-center gap-2">
+                    <span id="planBadge" class="text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">14d Trial</span>
+                </div>
+                <!-- Hamburger Button for Sidebar Drawer -->
+                <button onclick="toggleSidebar()" class="p-2 rounded-lg text-slate-700 hover:bg-slate-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="max-w-4xl mx-auto px-4 py-6">
-
-        <!-- VIEW 1: QR GENERATOR (#home) -->
-        <section id="view-home" class="space-y-6">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <h1 class="text-lg font-bold mb-1">Create QR Code</h1>
-                <p class="text-xs text-slate-500 mb-4">Static QR lifetime free hai. Link track aur edit karne ke liye Dynamic chunein.</p>
-
-                <!-- Mode Selector -->
-                <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl mb-4">
-                    <button id="modeStaticBtn" onclick="setQRMode('static')" class="py-2 text-sm font-bold rounded-lg bg-white text-indigo-600 shadow-sm">
-                        Static QR (Normal)
-                    </button>
-                    <button id="modeDynamicBtn" onclick="setQRMode('dynamic')" class="py-2 text-sm font-bold rounded-lg text-slate-600">
-                        Dynamic QR (Trackable)
-                    </button>
-                </div>
-
-                <!-- Dynamic Title (Only shown in Dynamic Mode) -->
-                <div id="dynamicFields" class="hidden mb-3">
-                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Campaign / Shop Name</label>
-                    <input type="text" id="qrTitle" placeholder="e.g. My Shop WhatsApp or Offers Page" class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <!-- Target URL / Text -->
-                <div class="mb-4">
-                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Website URL or Text</label>
-                    <input type="url" id="qrInput" placeholder="https://wa.me/919876543210 or https://example.com" class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <!-- Color Customization -->
-                <div class="grid grid-cols-2 gap-4 mb-5">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">QR Color</label>
-                        <input type="color" id="fgColor" value="#000000" class="w-full h-10 rounded-lg cursor-pointer border border-slate-300">
+    <!-- ================= SLIDE-OUT SIDEBAR DRAWER (Like Screenshot 1, 5 & 6) ================= -->
+    <div id="sidebarOverlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-50 transition-opacity"></div>
+    <aside id="sidebarDrawer" class="fixed top-0 left-0 bottom-0 w-72 bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col justify-between">
+        <!-- Top Drawer Links -->
+        <div>
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="grid grid-cols-2 gap-0.5 w-5 h-5">
+                        <span class="bg-red-500"></span><span class="bg-slate-900"></span>
+                        <span class="bg-slate-900"></span><span class="bg-emerald-600"></span>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Background</label>
-                        <input type="color" id="bgColor" value="#ffffff" class="w-full h-10 rounded-lg cursor-pointer border border-slate-300">
+                    <span class="font-extrabold text-xs leading-none">THE QR CODE<br>GENERATOR</span>
+                </div>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-700 text-xl font-bold">&times;</button>
+            </div>
+
+            <nav class="p-3 space-y-1 text-sm font-medium text-slate-700">
+                <a href="#home" onclick="toggleSidebar()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700">
+                    <span>⚡</span> QR Code Generator
+                </a>
+                
+                <!-- My QR Codes Submenu -->
+                <div class="pt-2">
+                    <a href="#dashboard" onclick="toggleSidebar()" class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-100 font-semibold text-slate-800">
+                        <span class="flex items-center gap-3"><span>🗂️</span> My QR Codes</span>
+                    </a>
+                    <div class="pl-9 space-y-1 mt-1 text-xs text-slate-500">
+                        <a href="#dashboard" onclick="toggleSidebar()" class="block py-1.5 hover:text-emerald-700">Active (<span id="navActiveCount">0</span>)</a>
+                        <a href="#dashboard" onclick="toggleSidebar()" class="block py-1.5 hover:text-emerald-700">Paused (<span id="navPausedCount">0</span>)</a>
                     </div>
                 </div>
 
-                <button id="generateBtn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-md hover:bg-indigo-700 transition">
-                    Generate QR Code
+                <a href="#analytics" onclick="toggleSidebar()" class="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700">
+                    <span class="flex items-center gap-3"><span>📈</span> Analytics</span>
+                    <span class="bg-[#1b5e20] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">TRY IT</span>
+                </a>
+
+                <a href="#pricing" onclick="toggleSidebar()" class="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700">
+                    <span class="flex items-center gap-3"><span>💳</span> Plans & Pricing</span>
+                    <span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded">PRO</span>
+                </a>
+
+                <!-- Hidden Master Admin Link (Only visible to Admin Email) -->
+                <a href="#admin" id="sidebarAdminLink" onclick="toggleSidebar()" class="hidden items-center justify-between px-3 py-2.5 rounded-lg bg-slate-900 text-amber-400 font-bold">
+                    <span class="flex items-center gap-3"><span>👑</span> Master Admin Panel</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Bottom Trial Warning & Auth Buttons (Like Screenshot 1 & 5) -->
+        <div class="p-4 border-t border-slate-200 space-y-3 bg-slate-50">
+            <!-- 14-Day Trial Box -->
+            <div id="trialCountdownBox" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p class="text-xs font-semibold text-red-700 flex items-center gap-1.5 mb-2">
+                    <span>⚠️</span> <span id="trialDaysText">Free trial ends in 14 days</span>
+                </p>
+                <a href="#pricing" onclick="toggleSidebar()" class="block w-full text-center bg-white border border-slate-800 text-slate-900 text-xs font-bold py-2 rounded hover:bg-slate-900 hover:text-white transition">
+                    UPGRADE NOW
+                </a>
+            </div>
+
+            <!-- Auth Buttons for Guest -->
+            <div id="guestSidebarBtns" class="space-y-2">
+                <button onclick="openAuthModal('login')" class="w-full py-2 text-xs font-bold border border-emerald-700 text-emerald-700 rounded-md hover:bg-emerald-50">
+                    Sign in
+                </button>
+                <button onclick="openAuthModal('signup')" class="w-full py-2 text-xs font-bold bg-[#2e7d32] text-white rounded-md hover:bg-[#1b5e20]">
+                    Sign up free
                 </button>
             </div>
 
-            <!-- QR Preview Card -->
-            <div id="qrPreviewCard" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
-                <h2 class="text-sm font-bold text-slate-700 mb-3">Your QR Code is Ready!</h2>
-                <div class="flex justify-center mb-4">
-                    <canvas id="qrCanvas" class="border p-2 rounded-xl shadow-sm"></canvas>
+            <!-- Logged In User Footer -->
+            <div id="userSidebarFooter" class="hidden items-center justify-between pt-1">
+                <div class="truncate pr-2">
+                    <p id="sidebarUserEmail" class="text-xs font-bold text-slate-800 truncate"></p>
+                    <p class="text-[10px] text-slate-500">Logged in securely</p>
                 </div>
-                <p id="shortLinkDisplay" class="text-xs text-indigo-600 font-mono mb-4 break-all hidden"></p>
-                <button id="downloadBtn" class="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow hover:bg-emerald-700">
-                    📥 Download PNG
-                </button>
+                <button id="sidebarLogoutBtn" class="text-xs text-red-600 font-bold hover:underline">Logout</button>
             </div>
-        </section>
+        </div>
+    </aside>
 
-        <!-- VIEW 2: CUSTOMER PERSONAL DASHBOARD (#dashboard) -->
-        <section id="view-dashboard" class="hidden space-y-4">
-            <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+    <!-- ================= MAIN CONTENT VIEWS ================= -->
+    <main class="flex-grow">
+
+        <!-- ==================== VIEW 1: HOME & GENERATOR (#home) ==================== -->
+        <section id="view-home">
+            <!-- Mint Green Hero Background (Like Screenshot 9) -->
+            <div class="bg-gradient-to-b from-[#e3f2e6] to-[#f8faf9] pt-8 pb-12 px-4">
+                <div class="max-w-4xl mx-auto text-center mb-6">
+                    <h1 class="text-2xl sm:text-4xl font-extrabold text-slate-900 mb-2">
+                        Free Dynamic QR Code Generator
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
+                        Create free dynamic QR Codes that you can easily update anytime and track scan data to optimize your campaigns. Start with our 14-day free trial!
+                    </p>
+                </div>
+
+                <!-- DARK CHARCOAL GENERATOR CARD (Exact Screenshot 9 Replica) -->
+                <div class="max-w-4xl mx-auto bg-[#1b1b1f] text-white rounded-2xl shadow-2xl p-5 sm:p-7 border border-slate-800">
+                    
+                    <!-- QR Content Type Tabs -->
+                    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-slate-700 pb-3 mb-5 text-xs font-semibold">
+                        <button onclick="setQRType('url')" id="tab-url" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg bg-slate-800 text-emerald-400 border border-emerald-500/40 shrink-0">
+                            <span>🔗</span><span>URL</span>
+                        </button>
+                        <button onclick="setQRType('whatsapp')" id="tab-whatsapp" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0">
+                            <span>💬</span><span>WhatsApp</span>
+                        </button>
+                        <button onclick="setQRType('text')" id="tab-text" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0">
+                            <span>📝</span><span>Plain Text</span>
+                        </button>
+                        <button onclick="setQRType('phone')" id="tab-phone" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0">
+                            <span>📞</span><span>Phone</span>
+                        </button>
+                        <button onclick="setQRType('email')" id="tab-email" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0">
+                            <span>✉️</span><span>Email</span>
+                        </button>
+                        <button onclick="setQRType('wifi')" id="tab-wifi" class="qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0">
+                            <span>📶</span><span>Wi-Fi</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                        <!-- Left Input Column -->
+                        <div class="md:col-span-7 space-y-4">
+                            <h2 id="inputHeading" class="text-sm font-bold text-white">Redirect to an existing web URL</h2>
+
+                            <!-- Campaign Name (Shown when Track Scans / Dynamic is ON) -->
+                            <div id="campaignTitleBox" class="hidden">
+                                <input type="text" id="qrTitle" placeholder="Campaign / Shop Name (e.g. My Shop Offer)" 
+                                    class="w-full bg-slate-800 text-white border border-slate-600 rounded-full px-4 py-2.5 text-xs focus:outline-none focus:border-emerald-400">
+                            </div>
+
+                            <!-- Main Input Field -->
+                            <div>
+                                <input type="text" id="qrInput" placeholder="Enter URL (e.g. https://example.com/)" 
+                                    class="w-full bg-white text-slate-900 rounded-full px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <p id="inputHint" class="text-[11px] text-slate-400 mt-1.5 pl-2">Try something like https://example.com/</p>
+                            </div>
+
+                            <!-- Custom Colors Row -->
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div class="bg-slate-800/80 p-2.5 rounded-xl flex items-center justify-between border border-slate-700">
+                                    <span class="text-xs text-slate-300">QR Color</span>
+                                    <input type="color" id="fgColor" value="#000000" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0">
+                                </div>
+                                <div class="bg-slate-800/80 p-2.5 rounded-xl flex items-center justify-between border border-slate-700">
+                                    <span class="text-xs text-slate-300">Background</span>
+                                    <input type="color" id="bgColor" value="#ffffff" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0">
+                                </div>
+                            </div>
+
+                            <!-- Bottom Toggle Switches (Exact Screenshot 9 style) -->
+                            <div class="flex flex-wrap items-center gap-5 pt-2">
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="dynamicToggle" onchange="toggleDynamicMode(this.checked)" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all relative peer-checked:bg-emerald-500"></div>
+                                    <span class="text-xs font-semibold text-slate-200">Track your scans <span class="text-amber-400">⚡</span></span>
+                                </label>
+
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="watermarkToggle" checked class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all relative peer-checked:bg-emerald-500"></div>
+                                    <span class="text-xs font-semibold text-slate-200">Clean QR (No Watermark) ✨</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Right QR Preview Column -->
+                        <div class="md:col-span-5 flex flex-col items-center">
+                            <p class="text-[11px] text-slate-300 mb-2 text-center">
+                                To enable tracking, <button onclick="enableDynamicQuick()" class="underline text-emerald-400 font-semibold">create a Dynamic QR Code</button>
+                            </p>
+                            <div class="bg-white p-3.5 rounded-2xl shadow-lg">
+                                <canvas id="qrCanvas" class="w-44 h-44"></canvas>
+                            </div>
+                            <p id="shortLinkDisplay" class="text-[11px] text-emerald-400 font-mono mt-2 break-all hidden text-center"></p>
+
+                            <!-- Save & Download Buttons -->
+                            <div class="flex items-center gap-2 mt-4 w-full justify-center">
+                                <button id="generateBtn" class="bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-bold text-xs px-6 py-3 rounded-lg shadow transition flex-grow max-w-[160px]">
+                                    Save & Generate
+                                </button>
+                                <button id="downloadBtn" title="Download PNG" class="bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg text-xs font-bold">
+                                    📥 PNG
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trustpilot / G2 Rating Card (Like Screenshot 9) -->
+                <div class="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mt-6 text-center">
+                    <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-600 text-white font-extrabold text-sm mb-1">G</div>
+                    <p class="text-xs font-bold text-slate-800">4.8/5 on G2 <span class="text-orange-500">★★★★★</span></p>
+                    <p class="text-[11px] text-slate-500 mb-3">Trusted by Modern Indian Businesses</p>
+                    <button onclick="openTrialModal()" class="w-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold py-2.5 rounded-md transition">
+                        Start 14-Day Free Trial
+                    </button>
+                    <p class="text-[10px] text-slate-400 mt-2">💳 No credit card required</p>
+                </div>
+            </div>
+
+            <!-- INFO & FAQ SECTIONS (Like Screenshot 8 & 9) -->
+            <div class="max-w-3xl mx-auto px-4 py-10 space-y-8">
+                <div class="text-center space-y-2">
+                    <h2 class="text-xl font-extrabold text-slate-900">What is a dynamic QR Code?</h2>
+                    <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        A dynamic QR Code is a QR Code whose destination link can be changed anytime even after printing! Instead of storing a fixed link, it points to a smart redirect link that tracks scans, city, device used, and lets you update the URL from your personal dashboard.
+                    </p>
+                </div>
+
+                <!-- FAQ Accordion (Like Screenshot 8) -->
                 <div>
-                    <h2 class="text-lg font-bold">My Dynamic QR Codes</h2>
-                    <p class="text-xs text-slate-500">Apne links track karein aur bina QR badle destination URL change karein</p>
+                    <h2 class="text-xl font-extrabold text-center text-slate-900 mb-4">Frequently asked questions</h2>
+                    <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-200 text-xs sm:text-sm">
+                        <details class="p-4 group">
+                            <summary class="font-bold cursor-pointer list-none flex justify-between items-center">
+                                How does the 14-day free trial work?
+                                <span class="text-slate-400 group-open:rotate-180 transition">▼</span>
+                            </summary>
+                            <p class="text-slate-600 mt-2 text-xs leading-relaxed">Jab aap sign up karte hain, aapko 14 din ke liye Dynamic QR codes aur full scan analytics bilkul free milta hai. 14 din baad aap UPI (`9661692365@ybl`) se Pro Plan upgrade kar sakte hain.</p>
+                        </details>
+                        <details class="p-4 group">
+                            <summary class="font-bold cursor-pointer list-none flex justify-between items-center">
+                                Can I change my QR link after printing it on my shop banner?
+                                <span class="text-slate-400 group-open:rotate-180 transition">▼</span>
+                            </summary>
+                            <p class="text-slate-600 mt-2 text-xs leading-relaxed">Haan! Dynamic QR Code ka sabse bada fayda yahi hai. Aap apne Dashboard me jaakar kabhi bhi naya WhatsApp ya website link daal sakte hain.</p>
+                        </details>
+                        <details class="p-4 group">
+                            <summary class="font-bold cursor-pointer list-none flex justify-between items-center">
+                                Are Static QR Codes free forever?
+                                <span class="text-slate-400 group-open:rotate-180 transition">▼</span>
+                            </summary>
+                            <p class="text-slate-600 mt-2 text-xs leading-relaxed">Bilkul! Static QR codes 100% lifetime free hain aur kabhi expire nahi hote.</p>
+                        </details>
+                    </div>
                 </div>
-                <div class="text-right">
-                    <span class="text-xs text-slate-400 block">Total Scans</span>
-                    <span id="userTotalScans" class="text-2xl font-extrabold text-indigo-600">0</span>
-                </div>
-            </div>
-
-            <div id="customerQrList" class="space-y-3">
-                <p class="text-center text-sm text-slate-400 py-8">Loading your QR codes...</p>
             </div>
         </section>
 
-        <!-- VIEW 3: MASTER ADMIN DASHBOARD (#admin) -->
-        <section id="view-admin" class="hidden space-y-4">
-            <div class="bg-slate-900 text-white p-5 rounded-2xl shadow-md">
-                <h2 class="text-lg font-bold text-amber-400">👑 Master Admin Control</h2>
-                <p class="text-xs text-slate-300 mb-4">Sabhi customers ke QR links aur global traffic par nazar rakhein.</p>
-                <div class="grid grid-cols-2 gap-3 text-center">
+        <!-- ==================== VIEW 2: MY QR CODES DASHBOARD (#dashboard) ==================== -->
+        <section id="view-dashboard" class="hidden max-w-4xl mx-auto px-4 py-6 space-y-4">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                <div>
+                    <h2 class="text-lg font-extrabold text-slate-900">My Dynamic QR Codes</h2>
+                    <p class="text-xs text-slate-500">Manage, pause, or update destination links without reprinting</p>
+                </div>
+                <a href="#home" class="bg-[#2e7d32] text-white text-xs font-bold px-4 py-2.5 rounded-lg">
+                    + Create Dynamic QR
+                </a>
+            </div>
+            <div id="customerQrList" class="space-y-3">
+                <p class="text-center text-sm text-slate-400 py-10">Loading your QR codes...</p>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 3: ANALYTICS DASHBOARD (#analytics - Like Screenshot 1 & 2) ==================== -->
+        <section id="view-analytics" class="hidden max-w-4xl mx-auto px-4 py-6 space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-2 bg-white p-4 rounded-xl border border-slate-200">
+                <div>
+                    <h2 class="text-lg font-extrabold">Analytics</h2>
+                    <p class="text-xs text-sky-600">ℹ️ Real-time scan tracking for your dynamic QR Codes</p>
+                </div>
+                <button onclick="exportAnalyticsCSV()" class="bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold px-4 py-2 rounded-md flex items-center gap-1.5">
+                    <span>📄</span> Export CSV
+                </button>
+            </div>
+
+            <!-- Top KPI Cards (Scans & Unique Users - Screenshot 1) -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-200">
+                    <span class="text-xs text-slate-500 font-medium">Total Scans</span>
+                    <p id="analyticsTotalScans" class="text-3xl font-extrabold text-slate-900 mt-1">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200">
+                    <span class="text-xs text-slate-500 font-medium">Active Dynamic Codes</span>
+                    <p id="analyticsActiveCodes" class="text-3xl font-extrabold text-emerald-700 mt-1">0</p>
+                </div>
+            </div>
+
+            <!-- Device & Time of Day Breakdown (Screenshot 2) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold">Scans by devices used ⓘ</h3>
+                    </div>
+                    <div id="deviceBreakdownList" class="space-y-2 text-xs text-slate-600 py-4 text-center">
+                        No scan data yet
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold">Scans by time of day <span class="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded ml-1">NEW</span></h3>
+                    </div>
+                    <div id="timeBreakdownList" class="space-y-2 text-xs text-slate-600 py-4 text-center">
+                        No scan data yet
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 4: PLANS & PRICING WITH UPI (#pricing - Like Screenshot 4) ==================== -->
+        <section id="view-pricing" class="hidden max-w-4xl mx-auto px-4 py-8 space-y-6">
+            <div class="text-center space-y-2">
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Plans & Pricing</h1>
+                <p class="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
+                    Start with our 14-day free trial and unlock unlimited dynamic QR codes & analytics with instant UPI upgrade.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- FREE / 14-DAY TRIAL CARD -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">Free Trial (14 Days)</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Test dynamic QR codes for your business</p>
+                        <p class="text-3xl font-extrabold text-slate-900 my-4">₹0 <span class="text-xs font-normal text-slate-500">/ 14 days</span></p>
+                        <button onclick="openAuthModal('signup')" class="w-full py-2.5 border border-slate-400 rounded-md text-xs font-bold text-slate-800 hover:bg-slate-100">
+                            Try for free
+                        </button>
+                        <ul class="mt-5 space-y-2.5 text-xs text-slate-600">
+                            <li>✓ Up to 5 Dynamic QR Codes</li>
+                            <li>✓ Unlimited Static QR Codes</li>
+                            <li>✓ 14 days of scan analytics</li>
+                            <li class="text-slate-400">✕ After 14 days requires Pro upgrade</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- FLEX / PRO PLAN CARD WITH UPI -->
+                <div class="bg-white rounded-2xl border-2 border-[#2e7d32] p-6 shadow-lg relative flex flex-col justify-between">
+                    <span class="absolute -top-3 right-4 bg-[#2e7d32] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">MOST POPULAR</span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">Flex Pro Plan</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Reach out to more customers without limits</p>
+                        <p class="text-3xl font-extrabold text-slate-900 my-4">₹499 <span class="text-xs font-normal text-slate-500">INR/month</span></p>
+                        <button onclick="openUpiModal()" class="w-full py-3 bg-[#2e7d32] hover:bg-[#1b5e20] rounded-md text-xs font-bold text-white shadow transition">
+                            Buy now - Pay with UPI (9661692365@ybl)
+                        </button>
+                        <ul class="mt-5 space-y-2.5 text-xs text-slate-700 font-medium">
+                            <li>✓ 50+ Dynamic QR Codes (Ad-free)</li>
+                            <li>✓ Edit target URL unlimited times</li>
+                            <li>✓ Full Device & Time Analytics + CSV Export</li>
+                            <li>✓ Watermark-free HD QR Codes</li>
+                            <li>✓ Instant UPI Activation Support</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 5: MASTER ADMIN DASHBOARD (#admin) ==================== -->
+        <section id="view-admin" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
+            <div class="bg-slate-900 text-white p-5 rounded-2xl shadow-lg">
+                <h2 class="text-lg font-extrabold text-amber-400">👑 Master Admin Control Panel</h2>
+                <p class="text-xs text-slate-300 mb-4">Protected by Firebase Server Security Rules. Manage Users, 14-Day Trials, UPI Approvals & Global QRs.</p>
+                <div class="grid grid-cols-3 gap-3 text-center">
                     <div class="bg-slate-800 p-3 rounded-xl">
-                        <span class="text-xs text-slate-400 block">Total Dynamic QRs</span>
-                        <span id="adminTotalQrs" class="text-xl font-bold text-white">0</span>
+                        <span class="text-[11px] text-slate-400 block">Total Users</span>
+                        <span id="adminTotalUsers" class="text-xl font-extrabold text-white">0</span>
                     </div>
                     <div class="bg-slate-800 p-3 rounded-xl">
-                        <span class="text-xs text-slate-400 block">Global Platform Scans</span>
-                        <span id="adminTotalScans" class="text-xl font-bold text-emerald-400">0</span>
+                        <span class="text-[11px] text-slate-400 block">Dynamic QRs</span>
+                        <span id="adminTotalQrs" class="text-xl font-extrabold text-emerald-400">0</span>
+                    </div>
+                    <div class="bg-slate-800 p-3 rounded-xl">
+                        <span class="text-[11px] text-slate-400 block">Pending UPI</span>
+                        <span id="adminPendingUpi" class="text-xl font-extrabold text-amber-400">0</span>
                     </div>
                 </div>
             </div>
 
-            <div id="adminQrList" class="space-y-3">
-                <p class="text-center text-sm text-slate-400 py-8">Loading master data...</p>
+            <!-- UPI Payment Verification List -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                <h3 class="text-sm font-extrabold text-slate-800 mb-3">💳 UPI Payment Requests (9661692365@ybl)</h3>
+                <div id="adminPaymentList" class="space-y-2 text-xs text-slate-500">
+                    No pending UPI requests.
+                </div>
+            </div>
+
+            <!-- All Users & Trial Control -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                <h3 class="text-sm font-extrabold text-slate-800 mb-3">👥 Customers & Plan Status</h3>
+                <div id="adminUsersList" class="space-y-2 text-xs text-slate-500">
+                    Loading users...
+                </div>
+            </div>
+
+            <!-- All QR Links Monitor -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                <h3 class="text-sm font-extrabold text-slate-800 mb-3">🔗 All Platform Dynamic QR Codes</h3>
+                <div id="adminQrList" class="space-y-2 text-xs text-slate-500">
+                    Loading QR codes...
+                </div>
             </div>
         </section>
 
     </main>
 
-    <!-- EDIT LINK MODAL (Controlled via #edit hash so Back Button closes it!) -->
-    <div id="editModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 shadow-xl">
-            <h3 class="text-base font-bold">Edit Dynamic QR Target Link</h3>
-            <p class="text-xs text-slate-500">Naya link save karte hi purana printed QR code naye link par khulega.</p>
-            <input type="hidden" id="editQrId">
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Campaign Name</label>
-                <input type="text" id="editQrTitle" class="w-full border rounded-xl px-3 py-2 text-sm">
+    <!-- ================= MODAL 1: 14-DAY FREE TRIAL POPUP (Exact Screenshot 3 Replica) ================= -->
+    <div id="trialPromoModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-xl overflow-hidden shadow-2xl">
+            <div class="bg-[#fef9c3] px-5 py-3.5 flex justify-between items-center border-b border-amber-200">
+                <h3 class="text-sm font-extrabold text-slate-900">Get started with our 14-day free trial 🎉</h3>
+                <button onclick="closeTrialModal()" class="text-slate-600 font-bold text-lg">&times;</button>
             </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">New Target URL</label>
-                <input type="url" id="editQrUrl" class="w-full border rounded-xl px-3 py-2 text-sm">
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="window.history.back()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-xl">
-                    Cancel (Back)
-                </button>
-                <button id="saveEditBtn" class="px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl">
-                    Update Link
+            <div class="p-5 space-y-4 text-xs text-slate-600">
+                <p>Try out the full range of features on The QR Code Generator with access to the Flex plan for the next 14 days:</p>
+                <ul class="space-y-2.5 font-semibold text-slate-800">
+                    <li class="flex items-center gap-2"><span class="text-emerald-700">✔</span> Create 5 dynamic QR Codes</li>
+                    <li class="flex items-center gap-2"><span class="text-emerald-700">✔</span> Edit target URL anytime without reprinting</li>
+                    <li class="flex items-center gap-2"><span class="text-emerald-700">✔</span> Ad-free scan experience for your QR Codes</li>
+                    <li class="flex items-center gap-2"><span class="text-emerald-700">✔</span> Advanced analytics like device & time of day</li>
+                </ul>
+                <p class="text-[11px] text-slate-500">You can continue with the Free Static plan or upgrade via UPI once the 14-day trial period ends.</p>
+                <button onclick="closeTrialModal(); openAuthModal('signup');" class="w-full bg-[#65a30d] hover:bg-[#4d7c0f] text-white font-bold py-3 rounded-md shadow transition">
+                    Start free trial
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Bottom App Navigation Bar (Mobile First) -->
-    <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex justify-around py-2.5 z-40 shadow-lg">
-        <a href="#home" id="nav-home" class="flex flex-col items-center text-xs font-bold text-indigo-600">
-            <span>⚡ Generator</span>
-        </a>
-        <a href="#dashboard" id="nav-dashboard" class="flex flex-col items-center text-xs font-bold text-slate-500">
-            <span>📊 My Dashboard</span>
-        </a>
-        <a href="#admin" id="nav-admin" class="hidden flex-col items-center text-xs font-bold text-amber-600">
-            <span>👑 Master Admin</span>
-        </a>
-    </nav>
+    <!-- ================= MODAL 2: EMAIL/PASSWORD + GOOGLE LOGIN MODAL ================= -->
+    <div id="authModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 id="authModalTitle" class="text-base font-extrabold text-slate-900">Sign in to your account</h3>
+                <button onclick="closeAuthModal()" class="text-slate-400 text-xl font-bold">&times;</button>
+            </div>
 
-    <!-- App Logic Script -->
+            <!-- Email & Password Form (Works for Customers AND Master Admin!) -->
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Email Address</label>
+                    <input type="email" id="authEmail" placeholder="name@gmail.com" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Password</label>
+                    <input type="password" id="authPassword" placeholder="••••••••" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <button id="emailAuthSubmitBtn" class="w-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white font-bold py-2.5 rounded-lg text-xs shadow">
+                    Continue with Email
+                </button>
+            </div>
+
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-slate-200"></div>
+                <span class="flex-shrink mx-3 text-[11px] text-slate-400">OR</span>
+                <div class="flex-grow border-t border-slate-200"></div>
+            </div>
+
+            <button id="googleLoginBtn" class="w-full border border-slate-300 hover:bg-slate-50 py-2.5 rounded-lg text-xs font-bold text-slate-700 flex items-center justify-center gap-2">
+                <span>🌐</span> Continue with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= MODAL 3: UPI PAYMENT GATEWAY (9661692365@ybl) ================= -->
+    <div id="upiModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl text-center">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-sm font-extrabold text-slate-900">⚡ Instant UPI Upgrade (Pro Plan)</h3>
+                <button onclick="closeUpiModal()" class="text-slate-400 text-xl font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-600">Scan QR or pay via any UPI App to activate Unlimited Dynamic QRs:</p>
+            
+            <div class="flex justify-center">
+                <canvas id="upiQrCanvas" class="border p-2 rounded-xl shadow-xs"></canvas>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                <p class="text-[11px] text-slate-500">Merchant UPI ID</p>
+                <p class="text-sm font-extrabold text-emerald-800 select-all">9661692365@ybl</p>
+                <p class="text-xs font-bold text-slate-800 mt-0.5">Amount: ₹499</p>
+            </div>
+
+            <a id="upiDeepLinkBtn" href="upi://pay?pa=9661692365@ybl&pn=SmartQR%20Pro&am=499&cu=INR" class="block w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg shadow">
+                📱 Open GPay / PhonePe / Paytm
+            </a>
+
+            <div class="text-left border-t pt-3 space-y-2">
+                <label class="block text-[11px] font-bold text-slate-700">Payment ke baad 12-Digit UTR / Ref No. dalein:</label>
+                <input type="text" id="upiUtrInput" placeholder="Enter 12-digit UTR Number" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+                <button id="submitUpiBtn" class="w-full bg-[#2e7d32] text-white text-xs font-bold py-2.5 rounded-lg">
+                    ✅ Submit Payment for Activation
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL 4: EDIT DYNAMIC URL MODAL ================= -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 shadow-xl">
+            <h3 class="text-sm font-extrabold">✏️ Edit Dynamic QR Destination</h3>
+            <input type="hidden" id="editQrId">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Campaign / Shop Name</label>
+                <input type="text" id="editQrTitle" class="w-full border rounded-lg px-3 py-2 text-xs">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">New Target URL</label>
+                <input type="url" id="editQrUrl" class="w-full border rounded-lg px-3 py-2 text-xs">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="window.history.back()" class="px-4 py-2 text-xs font-bold bg-slate-100 rounded-lg">Cancel</button>
+                <button id="saveEditBtn" class="px-4 py-2 text-xs font-bold text-white bg-[#2e7d32] rounded-lg">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Logic (Part 2 me iska pura updated code aayega) -->
     <script type="module" src="./app.js"></script>
 </body>
 </html>
