@@ -3,42 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting... | The QR Code Generator</title>
+    <title>SmartQR & Hub Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
 <body class="bg-[#1b1b1f] text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-    <!-- Loading / Status Card -->
-    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center shadow-2xl space-y-4">
+    <!-- Loading / Main Dynamic Content Card -->
+    <div id="mainCard" class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center shadow-2xl space-y-4">
         
-        <!-- Brand Header -->
-        <div class="flex items-center justify-center gap-2 mb-2">
+        <div class="flex items-center justify-center gap-2 mb-1">
             <div class="grid grid-cols-2 gap-0.5 w-5 h-5">
-                <span class="bg-red-500 rounded-xs"></span>
-                <span class="bg-white rounded-xs"></span>
-                <span class="bg-white rounded-xs"></span>
-                <span class="bg-emerald-500 rounded-xs"></span>
+                <span class="bg-red-500"></span><span class="bg-white"></span>
+                <span class="bg-white"></span><span class="bg-emerald-500"></span>
             </div>
-            <span class="font-extrabold text-xs tracking-tight text-white">THE QR CODE GENERATOR</span>
+            <span class="font-extrabold text-xs tracking-tight text-white">SMARTQR SUPER APP</span>
         </div>
 
-        <!-- Spinner Icon -->
-        <div id="spinnerBox" class="flex justify-center py-2">
+        <div id="spinnerBox" class="flex justify-center py-4">
             <div class="animate-spin w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
         </div>
 
-        <!-- Status Message -->
-        <h1 id="statusTitle" class="text-base font-bold text-white">Connecting to destination...</h1>
-        <p id="statusSub" class="text-xs text-slate-400">Fast & secure dynamic QR redirection</p>
+        <h1 id="statusTitle" class="text-base font-bold text-white">Loading destination...</h1>
+        <p id="statusSub" class="text-xs text-slate-400">Fast secure QR redirection</p>
 
-        <!-- Action Button (Hidden unless paused/error) -->
+        <!-- Dynamic Container for Social Hub / Visiting Card Views -->
+        <div id="dynamicContainer" class="hidden text-left space-y-3 pt-2"></div>
+
         <div id="actionBox" class="hidden pt-2">
-            <a href="./index.html" class="inline-block w-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold py-2.5 px-4 rounded-lg transition">
-                Create Your Own Dynamic QR Code
+            <a href="./index.html" class="inline-block w-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-xs font-bold py-3 px-4 rounded-xl transition">
+                ⚡ Create Your Own QR Code & Tools
             </a>
         </div>
     </div>
@@ -46,7 +41,6 @@
     <script type="module">
         import { db, doc, getDoc, updateDoc, increment, serverTimestamp } from "./firebase-config.js";
 
-        // 1. Detect Scanner Device Type for Analytics
         function detectDevice() {
             const ua = navigator.userAgent || "";
             if (/android/i.test(ua)) return "Android";
@@ -54,7 +48,6 @@
             return "Desktop";
         }
 
-        // 2. Detect Time of Day Slot for Analytics
         function detectTimeSlot() {
             const hour = new Date().getHours();
             if (hour >= 5 && hour < 12) return "Morning";
@@ -70,12 +63,70 @@
             document.getElementById("actionBox").classList.remove("hidden");
         }
 
-        async function handleScanRedirect() {
+        async function initViewer() {
             const params = new URLSearchParams(window.location.search);
             const shortId = params.get("id");
+            const hubEncoded = params.get("hub");
+            const cardEncoded = params.get("card");
 
+            // CASE 1: SOCIAL MEDIA HUB (LINK-IN-BIO)
+            if (hubEncoded) {
+                try {
+                    document.getElementById("spinnerBox").classList.add("hidden");
+                    const hubData = JSON.parse(decodeURIComponent(atob(hubEncoded)));
+                    document.getElementById("statusTitle").textContent = hubData.t || "Social Hub";
+                    document.getElementById("statusSub").textContent = "Connect with us instantly:";
+
+                    let linksHtml = "";
+                    if (hubData.ig) linksHtml += `<a href="${hubData.ig}" target="_blank" class="block w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs py-3 px-4 rounded-xl text-center shadow">📷 Instagram Profile</a>`;
+                    if (hubData.yt) linksHtml += `<a href="${hubData.yt}" target="_blank" class="block w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-3 px-4 rounded-xl text-center shadow">▶️ YouTube Channel</a>`;
+                    if (hubData.wa) linksHtml += `<a href="https://wa.me/${hubData.wa.replace(/\D/g, '')}" target="_blank" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-4 rounded-xl text-center shadow">💬 Chat on WhatsApp</a>`;
+                    if (hubData.wb) linksHtml += `<a href="${hubData.wb}" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 px-4 rounded-xl text-center shadow">🌐 Visit Website / Store</a>`;
+
+                    const cont = document.getElementById("dynamicContainer");
+                    cont.innerHTML = linksHtml || "<p class='text-xs text-center text-slate-400'>No links provided.</p>";
+                    cont.classList.remove("hidden");
+                    document.getElementById("actionBox").classList.remove("hidden");
+                    return;
+                } catch (e) {
+                    showErrorState("⚠️ Invalid Social Hub Link", "Link decode karne me error aayi.");
+                    return;
+                }
+            }
+
+            // CASE 2: SHOPKEEPER DIGITAL VISITING CARD MINI-WEBPAGE
+            if (cardEncoded) {
+                try {
+                    document.getElementById("spinnerBox").classList.add("hidden");
+                    const card = JSON.parse(decodeURIComponent(atob(cardEncoded)));
+                    document.getElementById("statusTitle").textContent = card.n || "Digital Store";
+                    document.getElementById("statusSub").textContent = card.a || "Official Business Page";
+
+                    const cleanPhone = (card.p || "").replace(/\D/g, '');
+                    const waMsg = encodeURIComponent(`Hello, I saw your Digital Visiting Card and want to inquire about your products/services.`);
+
+                    const cont = document.getElementById("dynamicContainer");
+                    cont.innerHTML = `
+                        <div class="bg-slate-800 p-4 rounded-xl space-y-2 border border-slate-700 text-xs">
+                            <p><strong>📍 Address:</strong> ${card.a || 'Not provided'}</p>
+                            <p><strong>📦 Products / Services:</strong> ${card.items || 'General Store'}</p>
+                        </div>
+                        <a href="https://wa.me/${cleanPhone}?text=${waMsg}" target="_blank" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl text-center shadow">
+                            💬 Order / Inquiry on WhatsApp (${card.p})
+                        </a>
+                    `;
+                    cont.classList.remove("hidden");
+                    document.getElementById("actionBox").classList.remove("hidden");
+                    return;
+                } catch (e) {
+                    showErrorState("⚠️ Invalid Visiting Card", "Visiting card data invalid hai.");
+                    return;
+                }
+            }
+
+            // CASE 3: STANDARD DYNAMIC QR REDIRECTOR WITH ANALYTICS
             if (!shortId) {
-                showErrorState("⚠️ Invalid QR Code Link", "Is QR link me koi valid ID nahi mili.");
+                showErrorState("⚠️ Invalid QR Link", "Is QR link me koi valid ID nahi mili.");
                 return;
             }
 
@@ -90,7 +141,6 @@
 
                 const data = qrSnap.data();
 
-                // Check if paused by Customer or Master Admin
                 if (!data.active) {
                     showErrorState("⏸️ QR Code Paused", "Is QR Code ke owner ne filhal is link ko rok (pause) rakha hai.");
                     return;
@@ -99,7 +149,6 @@
                 const device = detectDevice();
                 const timeSlot = detectTimeSlot();
 
-                // Update Scan Count + Device + Time of Day in Firestore (Matches Anti-Hacker Rules)
                 try {
                     await updateDoc(qrRef, {
                         scans: increment(1),
@@ -107,19 +156,15 @@
                         [`analytics.devices.${device}`]: increment(1),
                         [`analytics.timeOfDay.${timeSlot}`]: increment(1)
                     });
-                } catch (analyticErr) {
-                    // Agar network slow ho tab bhi redirect na ruke
-                    console.warn("Analytics update skipped:", analyticErr);
+                } catch (err) {
+                    console.warn("Analytics skipped:", err);
                 }
 
-                // Format Destination URL Safely
                 let target = (data.targetUrl || "").trim();
-                const isSpecialProtocol = /^(https?:\/\/|tel:|mailto:|upi:\/\/|WIFI:)/i.test(target);
-                if (!isSpecialProtocol) {
+                if (!/^(https?:\/\/|tel:|mailto:|upi:\/\/|WIFI:)/i.test(target)) {
                     target = "https://" + target;
                 }
 
-                // Redirect without keeping r.html in browser back-button history
                 window.location.replace(target);
 
             } catch (err) {
@@ -127,7 +172,7 @@
             }
         }
 
-        handleScanRedirect();
+        initViewer();
     </script>
 </body>
 </html>
