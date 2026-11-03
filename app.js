@@ -6,16 +6,15 @@ import {
     collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp 
 } from "./firebase-config.js";
 
-// Global State
+// Global App State
 let currentUser = null;
-let currentUserData = null; // Stores { plan: 'trial'|'pro', trialStartMs, daysLeft, isExpired }
-let currentQRType = "url";
+let currentUserData = null; // { plan, trialStartMs, daysLeft, isPro, isExpired }
 let isDynamicMode = false;
 let authMode = "login"; // 'login' or 'signup'
-let cachedUserQRs = []; // For Analytics & CSV Export
+let cachedUserQRs = [];
 
 // =========================================================
-// 1. MOBILE BACK-BUTTON ROUTER & MODAL CONTROLLER
+// 1. MOBILE BACK-BUTTON ROUTER & DIRECT MODAL NAVIGATION
 // =========================================================
 window.toggleSidebar = function(forceClose = false) {
     const drawer = document.getElementById("sidebarDrawer");
@@ -31,35 +30,51 @@ window.toggleSidebar = function(forceClose = false) {
     }
 };
 
-function closeAllModalsUI() {
-    document.getElementById("trialPromoModal").classList.add("hidden");
-    document.getElementById("authModal").classList.add("hidden");
-    document.getElementById("upiModal").classList.add("hidden");
-    document.getElementById("editModal").classList.add("hidden");
+function hideAllModals() {
+    ["trialPromoModal", "authModal", "upiModal", "editModal"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("hidden");
+    });
     window.toggleSidebar(true);
 }
 
+// FIXED: Direct Auth opener without history.back() race condition
+window.goDirectAuth = function(mode = "signup") {
+    authMode = mode;
+    setupAuthModalUI(mode);
+    window.location.hash = `#${mode}`;
+};
+
+window.openTrialModal = function() {
+    window.location.hash = "#trial";
+};
+
+window.openUpiModal = function() {
+    window.location.hash = "#upi";
+};
+
 function handleRoute() {
     const hash = window.location.hash || "#home";
-    closeAllModalsUI();
+    hideAllModals();
 
-    // Check if Hash is a Popup Modal (So Mobile Back Button closes the modal!)
+    // 1. Handle Modal Routes (Pressing mobile Back button closes modal cleanly)
     if (hash === "#trial") {
         document.getElementById("trialPromoModal").classList.remove("hidden");
         return;
     }
     if (hash === "#login" || hash === "#signup") {
-        setupAuthModalUI(hash.replace("#", ""));
+        const mode = hash.replace("#", "");
+        setupAuthModalUI(mode);
         document.getElementById("authModal").classList.remove("hidden");
         return;
     }
     if (hash === "#upi") {
         if (!currentUser) {
-            alert("Pro Plan upgrade karne ke liye pehle Sign In karein!");
-            window.location.hash = "#login";
+            alert("Pro Plan (₹499.00) activate karne ke liye pehle Sign In ya Sign Up karein!");
+            window.goDirectAuth("signup");
             return;
         }
-        renderUpiModalQR();
+        renderUpiPaymentGatewayQR();
         document.getElementById("upiModal").classList.remove("hidden");
         return;
     }
@@ -68,38 +83,55 @@ function handleRoute() {
         return;
     }
 
-    // Hide all main page views
-    const views = ["view-home", "view-dashboard", "view-analytics", "view-pricing", "view-admin"];
-    views.forEach(id => document.getElementById(id).classList.add("hidden"));
+    // 2. Hide All Main Section Views
+    const allViews = [
+        "view-home", "view-bulk-qr", "view-dashboard", 
+        "view-analytics", "view-cyber-tools", "view-biz-tools", 
+        "view-pricing", "view-admin"
+    ];
+    allViews.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("hidden");
+    });
 
-    // Route to Selected Page View
-    if (hash === "#dashboard") {
+    // 3. Activate Requested View
+    if (hash === "#bulk-qr") {
+        document.getElementById("view-bulk-qr").classList.remove("hidden");
+    } 
+    else if (hash === "#cyber-tools") {
+        document.getElementById("view-cyber-tools").classList.remove("hidden");
+    } 
+    else if (hash === "#biz-tools") {
+        document.getElementById("view-biz-tools").classList.remove("hidden");
+        if (window.generateProductBarcode) window.generateProductBarcode();
+    } 
+    else if (hash === "#pricing") {
+        document.getElementById("view-pricing").classList.remove("hidden");
+    } 
+    else if (hash === "#dashboard") {
         if (!currentUser) {
-            window.location.hash = "#login";
+            window.goDirectAuth("login");
             return;
         }
         document.getElementById("view-dashboard").classList.remove("hidden");
-        loadCustomerDashboard();
+        loadUserDashboard();
     } 
     else if (hash === "#analytics") {
         if (!currentUser) {
-            window.location.hash = "#login";
+            window.goDirectAuth("login");
             return;
         }
         if (currentUserData && currentUserData.isExpired) {
-            alert("⚠️ Aapka 14-day free trial samapt ho gaya hai! Analytics dekhne ke liye Pro Plan upgrade karein.");
+            alert("⚠️ Aapka 14-Day Free Trial samapt ho chuka hai! Live Analytics ke liye ₹499.00 Pro Plan upgrade karein.");
             window.location.hash = "#pricing";
             return;
         }
         document.getElementById("view-analytics").classList.remove("hidden");
         loadCustomerAnalytics();
     } 
-    else if (hash === "#pricing") {
-        document.getElementById("view-pricing").classList.remove("hidden");
-    } 
     else if (hash === "#admin") {
         if (!currentUser || currentUser.email.toLowerCase() !== MASTER_ADMIN_EMAIL.toLowerCase()) {
-            alert("⛔ Access Denied! Sirf Master Admin is panel ko khol sakta hai.");
+            alert("⛔ Access Denied! Sirf Master Admin is panel ko dekh sakta hai.");
             window.location.hash = "#home";
             return;
         }
@@ -113,66 +145,77 @@ function handleRoute() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-// Initialize History State so Back Button stays inside the Web App
 if (!window.location.hash) {
     window.history.replaceState(null, "", "#home");
 }
 window.addEventListener("hashchange", handleRoute);
-window.addEventListener("DOMContentLoaded", () => {
-    renderLiveQRPreview("https://example.com");
-    handleRoute();
-});
+window.addEventListener("DOMContentLoaded", handleRoute);
 
-// Modal Trigger Helpers (Uses Hash History)
-window.openTrialModal = () => { window.location.hash = "#trial"; };
-window.closeTrialModal = () => { window.history.back(); };
-
-window.openAuthModal = (mode = "login") => { window.location.hash = `#${mode}`; };
-window.closeAuthModal = () => { window.history.back(); };
-
-window.openUpiModal = () => { window.location.hash = "#upi"; };
-window.closeUpiModal = () => { window.history.back(); };
+// =========================================================
+// 2. AUTHENTICATION & PASSWORD SHOW/HIDE BUTTON (👁️)
+// =========================================================
+window.togglePasswordVisibility = function() {
+    const passInput = document.getElementById("authPassword");
+    const toggleBtn = document.getElementById("passToggleBtn");
+    if (passInput.type === "password") {
+        passInput.type = "text";
+        toggleBtn.textContent = "🙈 Hide";
+    } else {
+        passInput.type = "password";
+        toggleBtn.textContent = "👁️ Show";
+    }
+};
 
 function setupAuthModalUI(mode) {
     authMode = mode;
     const title = document.getElementById("authModalTitle");
-    const btn = document.getElementById("emailAuthSubmitBtn");
+    const submitBtn = document.getElementById("emailAuthSubmitBtn");
+    const tabLogin = document.getElementById("tabAuthLogin");
+    const tabSignup = document.getElementById("tabAuthSignup");
+
     if (mode === "signup") {
-        title.textContent = "Start your 14-Day Free Trial";
-        btn.textContent = "Create Account (Sign Up)";
+        title.textContent = "Start Your 14-Day Free Trial 🎉";
+        submitBtn.textContent = "Create Free Account (Sign Up)";
+        tabSignup.className = "py-1.5 rounded bg-white text-emerald-800 shadow-xs font-extrabold";
+        tabLogin.className = "py-1.5 rounded text-slate-500";
     } else {
-        title.textContent = "Sign in to your account";
-        btn.textContent = "Sign In with Email";
+        title.textContent = "Sign in to User Dashboard";
+        submitBtn.textContent = "Sign In with Email";
+        tabLogin.className = "py-1.5 rounded bg-white text-slate-900 shadow-xs font-extrabold";
+        tabSignup.className = "py-1.5 rounded text-slate-500";
     }
 }
 
-// =========================================================
-// 2. AUTHENTICATION & 14-DAY FREE TRIAL ENGINE
-// =========================================================
 document.getElementById("emailAuthSubmitBtn").addEventListener("click", async () => {
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value.trim();
 
     if (!email || !pass) {
-        alert("Kripya apna Email aur Password dono dalein!");
+        alert("Kripya Email aur Password dono enter karein!");
+        return;
+    }
+    if (pass.length < 6) {
+        alert("Password kam se kam 6 characters ka hona chahiye!");
         return;
     }
 
     const btn = document.getElementById("emailAuthSubmitBtn");
     btn.disabled = true;
-    btn.textContent = "Please wait...";
+    btn.textContent = "Processing...";
 
     try {
         if (authMode === "signup") {
             await createUserWithEmailAndPassword(auth, email, pass);
         } else {
-            // Try Sign In first; if new customer typed in Sign In box, offer signup
             await signInWithEmailAndPassword(auth, email, pass);
         }
         window.location.hash = "#dashboard";
     } catch (err) {
-        if (authMode === "login" && err.code === "auth/invalid-credential") {
-            alert("Incorrect Email ya Password! Agar aap naye user hain toh 'Sign up free' par click karein.");
+        if (authMode === "signup" && err.code === "auth/email-already-in-use") {
+            alert("Yeh Email pehle se registered hai! Kripya Sign In tab par click karke login karein.");
+            window.goDirectAuth("login");
+        } else if (authMode === "login" && err.code === "auth/invalid-credential") {
+            alert("Galat Email ya Password! Agar aapka account nahi bana hai toh 'Sign Up (14d Free)' par click karein.");
         } else {
             alert("Auth Error: " + err.message);
         }
@@ -187,7 +230,7 @@ document.getElementById("googleLoginBtn").addEventListener("click", async () => 
         await signInWithPopup(auth, provider);
         window.location.hash = "#dashboard";
     } catch (err) {
-        alert("Google Sign-In failed: " + err.message);
+        alert("Google Login Error: " + err.message);
     }
 });
 
@@ -197,14 +240,12 @@ document.getElementById("sidebarLogoutBtn").addEventListener("click", async () =
     window.location.hash = "#home";
 });
 
-// Check User Profile & 14-Day Trial Status in Firestore
 async function syncUserProfileAndTrial(user) {
     const userRef = doc(db, "users", user.uid);
     const snap = await getDoc(userRef);
 
     let data;
     if (!snap.exists()) {
-        // First time user -> Start 14-Day Trial
         data = {
             uid: user.uid,
             email: user.email,
@@ -223,14 +264,8 @@ async function syncUserProfileAndTrial(user) {
     const isPro = data.plan === "pro" || isMasterAdmin;
     const isExpired = !isPro && daysLeft <= 0;
 
-    currentUserData = {
-        ...data,
-        daysLeft,
-        isPro,
-        isExpired
-    };
+    currentUserData = { ...data, daysLeft, isPro, isExpired };
 
-    // Update UI Badges & Sidebar Trial Countdown
     const planBadge = document.getElementById("planBadge");
     const trialBox = document.getElementById("trialCountdownBox");
     const trialDaysText = document.getElementById("trialDaysText");
@@ -244,10 +279,10 @@ async function syncUserProfileAndTrial(user) {
         planBadge.className = "text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full";
         trialBox.classList.add("hidden");
     } else if (isExpired) {
-        planBadge.textContent = "⚠️ Trial Expired";
+        planBadge.textContent = "⚠️ Trial Ended";
         planBadge.className = "text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full";
         trialBox.classList.remove("hidden");
-        trialDaysText.textContent = "Free trial expired! Upgrade now";
+        trialDaysText.textContent = "14-Day Trial Expired! Upgrade ₹499";
     } else {
         planBadge.textContent = `⏳ ${daysLeft}d Trial`;
         planBadge.className = "text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full";
@@ -274,7 +309,6 @@ onAuthStateChanged(auth, async (user) => {
         userFooter.classList.add("flex");
         document.getElementById("sidebarUserEmail").textContent = user.email;
 
-        // Unlock Master Admin Link if email matches
         if (user.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) {
             adminLink.classList.remove("hidden");
             adminLink.classList.add("flex");
@@ -283,7 +317,7 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         await syncUserProfileAndTrial(user);
-        updateSidebarCounts();
+        updateSidebarQrCounts();
     } else {
         currentUserData = null;
         topSignupBtn.classList.remove("hidden");
@@ -296,150 +330,62 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // =========================================================
-// 3. STATIC & DYNAMIC QR GENERATOR ENGINE
+// 3. NORMAL VS DYNAMIC QR GENERATION & SAVING
 // =========================================================
-window.setQRType = function(type) {
-    currentQRType = type;
-    document.querySelectorAll(".qr-tab").forEach(btn => {
-        btn.className = "qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 shrink-0";
-    });
-    const activeTab = document.getElementById(`tab-${type}`);
-    if (activeTab) {
-        activeTab.className = "qr-tab flex flex-col items-center gap-1 px-3 py-2 rounded-lg bg-slate-800 text-emerald-400 border border-emerald-500/40 shrink-0";
-    }
-
-    const heading = document.getElementById("inputHeading");
-    const input = document.getElementById("qrInput");
-    const hint = document.getElementById("inputHint");
-
-    const configs = {
-        url: { h: "Redirect to an existing web URL", p: "Enter URL (e.g. https://example.com/)", t: "Try something like https://example.com/" },
-        whatsapp: { h: "Direct WhatsApp Chat QR", p: "Enter 10-digit WhatsApp Number (e.g. 919876543210)", t: "Customer scan karte hi aapke WhatsApp par message bhej sakega" },
-        text: { h: "Plain Text or Notice QR", p: "Enter any text or note...", t: "Works offline when scanned" },
-        phone: { h: "Instant Phone Call QR", p: "Enter Phone Number with +91", t: "Scanners will immediately dial this number" },
-        email: { h: "Send Email QR Code", p: "Enter Email Address (e.g. support@shop.com)", t: "Opens email app automatically" },
-        wifi: { h: "Wi-Fi Auto Connect QR", p: "NetworkName,Password (comma separated)", t: "Example: MyShopWiFi,12345678" }
-    };
-
-    heading.textContent = configs[type].h;
-    input.placeholder = configs[type].p;
-    hint.textContent = configs[type].t;
-};
-
-window.toggleDynamicMode = function(checked) {
-    isDynamicMode = checked;
+window.toggleDynamicMode = function(enableDyn) {
+    isDynamicMode = enableDyn;
+    const btnStatic = document.getElementById("btnStaticMode");
+    const btnDyn = document.getElementById("btnDynamicMode");
     const titleBox = document.getElementById("campaignTitleBox");
-    if (checked) {
+
+    if (enableDyn) {
+        btnDyn.className = "px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-600 text-white shadow";
+        btnStatic.className = "px-3 py-1.5 rounded-md text-xs font-bold text-slate-400 hover:text-white";
         titleBox.classList.remove("hidden");
     } else {
+        btnStatic.className = "px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-600 text-white shadow";
+        btnDyn.className = "px-3 py-1.5 rounded-md text-xs font-bold text-slate-400 hover:text-white";
         titleBox.classList.add("hidden");
     }
 };
 
-window.enableDynamicQuick = function() {
-    const toggle = document.getElementById("dynamicToggle");
-    toggle.checked = true;
-    window.toggleDynamicMode(true);
-    document.getElementById("qrTitle").focus();
-};
-
-function formatPayloadByType(raw) {
-    if (currentQRType === "whatsapp") {
-        const cleanNum = raw.replace(/\D/g, "");
-        return `https://wa.me/${cleanNum}`;
-    }
-    if (currentQRType === "phone") return `tel:${raw.trim()}`;
-    if (currentQRType === "email") return `mailto:${raw.trim()}`;
-    if (currentQRType === "wifi") {
-        const parts = raw.split(",");
-        const ssid = (parts[0] || "").trim();
-        const pass = (parts[1] || "").trim();
-        return `WIFI:T:WPA;S:${ssid};P:${pass};;`;
-    }
-    return raw.trim();
-}
-
-function renderLiveQRPreview(value) {
-    const canvas = document.getElementById("qrCanvas");
-    const fgColor = document.getElementById("fgColor").value;
-    const bgColor = document.getElementById("bgColor").value;
-    const cleanWatermark = document.getElementById("watermarkToggle").checked;
-
-    new QRious({
-        element: canvas,
-        value: value || "https://example.com",
-        size: 220,
-        foreground: fgColor,
-        background: bgColor,
-        level: "H"
-    });
-
-    // Optional Brand Watermark if toggle is OFF
-    if (!cleanWatermark) {
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(65, 202, 90, 16);
-        ctx.fillStyle = fgColor;
-        ctx.font = "bold 10px Inter, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("SmartQR Pro", 110, 213);
-    }
-}
-
-// Live preview update on input/color change
-["qrInput", "fgColor", "bgColor", "watermarkToggle"].forEach(id => {
-    document.getElementById(id).addEventListener("input", () => {
-        const val = document.getElementById("qrInput").value.trim() || "https://example.com";
-        renderLiveQRPreview(formatPayloadByType(val));
-    });
-});
-
 document.getElementById("generateBtn").addEventListener("click", async () => {
-    const rawInput = document.getElementById("qrInput").value.trim();
-    const title = document.getElementById("qrTitle").value.trim() || "My Campaign QR";
-    const fgColor = document.getElementById("fgColor").value;
-    const bgColor = document.getElementById("bgColor").value;
+    const payload = window.getCurrentFormattedPayload();
+    const qrType = window.getCurrentQRType();
+    const customCfg = window.getCurrentQrCustomConfig();
+    const title = document.getElementById("qrTitle").value.trim() || `My ${qrType.toUpperCase()} QR`;
     const shortLinkDisplay = document.getElementById("shortLinkDisplay");
 
-    if (!rawInput) {
-        alert("Kripya pehle URL ya details enter karein!");
-        return;
-    }
-
-    const formattedTarget = formatPayloadByType(rawInput);
-
-    // CASE 1: STATIC QR CODE (Free Forever)
+    // 1. NORMAL / STATIC QR (100% Free with Full Customization)
     if (!isDynamicMode) {
         shortLinkDisplay.classList.add("hidden");
-        renderLiveQRPreview(formattedTarget);
-        alert("✅ Static QR Ready! Aap 'PNG' button dabakar download kar sakte hain.");
+        await window.renderCustomQrToCanvas(payload, customCfg);
+        alert("✅ Custom Normal QR Ready! 'Download HD' button dabakar save kar lein.");
         return;
     }
 
-    // CASE 2: DYNAMIC QR CODE (Requires Login & Active Trial / Pro Plan)
+    // 2. DYNAMIC TRACKABLE QR (Requires Login)
     if (!currentUser) {
         window.openTrialModal();
         return;
     }
 
-    // Check 14-Day Trial Expiry
     if (currentUserData && currentUserData.isExpired) {
-        alert("⚠️ Aapka 14-Day Free Trial khatam ho chuka hai! Unlimited Dynamic QR codes banane ke liye UPI se Pro Plan activate karein.");
+        alert("⚠️ Aapka 14-Day Free Trial khatam ho gaya hai! Dynamic QR banane ke liye ₹499.00 Pro Plan upgrade karein.");
         window.location.hash = "#pricing";
         return;
     }
 
     const btn = document.getElementById("generateBtn");
     btn.disabled = true;
-    btn.textContent = "Saving...";
+    btn.textContent = "Saving Dynamic QR...";
 
     try {
-        // Check Trial Limit (Max 5 Dynamic QRs in Free Trial)
         if (currentUserData && !currentUserData.isPro) {
             const qCheck = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
             const snapCheck = await getDocs(qCheck);
             if (snapCheck.size >= 5) {
-                alert("⚠️ Free Trial me aap 5 Dynamic QR codes bana sakte hain. Aur banane ke liye Pro Plan upgrade karein!");
+                alert("⚠️ Free Trial me 5 Dynamic QR codes allowed hain. Unlimited banane ke liye ₹499.00 Pro Plan lein!");
                 window.location.hash = "#pricing";
                 return;
             }
@@ -452,12 +398,14 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
         await setDoc(doc(db, "qrcodes", shortId), {
             shortId: shortId,
             title: title,
-            qrType: currentQRType,
-            targetUrl: formattedTarget,
+            qrType: qrType,
+            targetUrl: payload,
             userId: currentUser.uid,
             userEmail: currentUser.email,
-            fgColor: fgColor,
-            bgColor: bgColor,
+            fgColor: customCfg.fgColor,
+            bgColor: customCfg.bgColor,
+            dotStyle: customCfg.dotStyle,
+            bottomText: customCfg.bottomText,
             scans: 0,
             active: true,
             analytics: {
@@ -467,32 +415,23 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
             createdAt: serverTimestamp()
         });
 
-        renderLiveQRPreview(redirectUrl);
-        shortLinkDisplay.textContent = `Short Link: ${redirectUrl}`;
+        await window.renderCustomQrToCanvas(redirectUrl, customCfg);
+        shortLinkDisplay.textContent = `Tracking Link: ${redirectUrl}`;
         shortLinkDisplay.classList.remove("hidden");
-        updateSidebarCounts();
-        alert("🎉 Dynamic QR Saved! Aap ise apne Dashboard se kabhi bhi track ya edit kar sakte hain.");
+        updateSidebarQrCounts();
+        alert("🎉 Dynamic QR Saved! Aap 'User Dashboard' me jaakar iska link edit, track ya delete kar sakte hain.");
     } catch (err) {
-        alert("Error creating Dynamic QR: " + err.message);
+        alert("Error saving Dynamic QR: " + err.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = "Save & Generate";
+        btn.textContent = "⚡ Generate & Save QR";
     }
 });
 
-// Download PNG Button
-document.getElementById("downloadBtn").addEventListener("click", () => {
-    const canvas = document.getElementById("qrCanvas");
-    const link = document.createElement("a");
-    link.download = `QR-${Date.now()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-});
-
 // =========================================================
-// 4. CUSTOMER DASHBOARD & ANALYTICS + CSV EXPORT
+// 4. USER DASHBOARD (WITH DELETE, EDIT, PAUSE & DOWNLOAD)
 // =========================================================
-async function updateSidebarCounts() {
+async function updateSidebarQrCounts() {
     if (!currentUser) return;
     try {
         const q = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
@@ -505,13 +444,13 @@ async function updateSidebarCounts() {
         document.getElementById("navActiveCount").textContent = active;
         document.getElementById("navPausedCount").textContent = paused;
     } catch (e) {
-        console.error(e);
+        console.warn(e);
     }
 }
 
-async function loadCustomerDashboard() {
+async function loadUserDashboard() {
     const container = document.getElementById("customerQrList");
-    container.innerHTML = `<p class="text-center text-sm text-slate-400 py-10">Loading your QR codes...</p>`;
+    container.innerHTML = `<p class="text-center text-sm text-slate-400 py-10">Loading your User Dashboard...</p>`;
 
     try {
         const q = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
@@ -525,6 +464,8 @@ async function loadCustomerDashboard() {
             const d = docSnap.data();
             cachedUserQRs.push(d);
             const shortUrl = `${basePath}r.html?id=${d.shortId}`;
+            const safeTitle = (d.title || "QR").replace(/'/g, "");
+            const safeTarget = (d.targetUrl || "").replace(/'/g, "");
 
             html += `
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row justify-between gap-3">
@@ -534,23 +475,26 @@ async function loadCustomerDashboard() {
                             <h3 class="font-extrabold text-sm text-slate-900">${d.title}</h3>
                             <span class="text-[10px] uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">${d.qrType || 'URL'}</span>
                         </div>
-                        <p class="text-xs text-slate-500 break-all">Destination: <a href="${d.targetUrl}" target="_blank" class="text-emerald-700 font-semibold underline">${d.targetUrl}</a></p>
-                        <p class="text-[11px] text-slate-400 font-mono">Short Link: ${shortUrl}</p>
+                        <p class="text-xs text-slate-500 break-all">Target: <span class="text-emerald-700 font-semibold">${d.targetUrl}</span></p>
+                        <p class="text-[11px] text-slate-400 font-mono break-all">Short Link: ${shortUrl}</p>
                     </div>
 
                     <div class="flex sm:flex-col justify-between items-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0">
                         <span class="bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-extrabold">
                             👁️ ${d.scans || 0} Scans
                         </span>
-                        <div class="flex items-center gap-1.5">
-                            <button onclick="openEditQrModal('${d.shortId}', '${d.title.replace(/'/g, "")}', '${d.targetUrl.replace(/'/g, "")}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-lg font-bold">
-                                ✏️ Edit Link
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <button onclick="openEditQrModal('${d.shortId}', '${safeTitle}', '${safeTarget}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1.5 rounded-lg font-bold">
+                                ✏️ Edit
                             </button>
-                            <button onclick="toggleCustomerQr('${d.shortId}', ${d.active})" class="text-xs bg-amber-50 text-amber-800 px-2.5 py-1.5 rounded-lg font-bold">
+                            <button onclick="toggleCustomerQr('${d.shortId}', ${d.active})" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1.5 rounded-lg font-bold">
                                 ${d.active ? '⏸️ Pause' : '▶️ Resume'}
                             </button>
-                            <button onclick="downloadSavedQR('${shortUrl}', '${d.fgColor || '#000000'}', '${d.bgColor || '#ffffff'}', '${d.shortId}')" class="text-xs bg-[#2e7d32] text-white px-3 py-1.5 rounded-lg font-bold">
-                                📥 PNG
+                            <button onclick="downloadSavedCustomQR('${shortUrl}', '${d.fgColor || '#000000'}', '${d.bgColor || '#ffffff'}', '${d.dotStyle || 'square'}', '${(d.bottomText || '').replace(/'/g, '')}', '${d.shortId}')" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg font-bold">
+                                📥 QR
+                            </button>
+                            <button onclick="deleteCustomerQr('${d.shortId}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg font-bold">
+                                🗑️ Delete
                             </button>
                         </div>
                     </div>
@@ -560,19 +504,30 @@ async function loadCustomerDashboard() {
 
         container.innerHTML = html || `
             <div class="bg-white p-8 rounded-xl border border-slate-200 text-center space-y-3">
-                <p class="text-sm font-bold text-slate-700">Abhi tak aapne koi Dynamic QR nahi banaya hai.</p>
-                <a href="#home" class="inline-block bg-[#2e7d32] text-white text-xs font-bold px-4 py-2 rounded-lg">Create First Dynamic QR</a>
+                <p class="text-sm font-bold text-slate-700">Aapke User Dashboard me abhi koi Dynamic QR nahi hai.</p>
+                <a href="#home" class="inline-block bg-[#2e7d32] text-white text-xs font-bold px-4 py-2.5 rounded-lg">+ Create First Dynamic QR</a>
             </div>
         `;
-        updateSidebarCounts();
+        updateSidebarQrCounts();
     } catch (err) {
-        container.innerHTML = `<p class="text-center text-xs text-red-500">Error: ${err.message}</p>`;
+        container.innerHTML = `<p class="text-center text-xs text-red-500">Error loading User Dashboard: ${err.message}</p>`;
     }
 }
 
+// DELETE QR FROM USER DASHBOARD
+window.deleteCustomerQr = async function(shortId) {
+    if (!confirm("Kya aap sach me is Dynamic QR Code ko hamesha ke liye Delete karna chahte hain?")) return;
+    try {
+        await deleteDoc(doc(db, "qrcodes", shortId));
+        loadUserDashboard();
+    } catch (err) {
+        alert("Delete Error: " + err.message);
+    }
+};
+
 window.openEditQrModal = function(shortId, title, targetUrl) {
     if (currentUserData && currentUserData.isExpired) {
-        alert("⚠️ Trial Expired! Destination URL edit karne ke liye Pro Plan upgrade karein.");
+        alert("⚠️ 14-Day Trial Expired! Link update karne ke liye ₹499.00 Pro Plan activate karein.");
         window.location.hash = "#pricing";
         return;
     }
@@ -587,37 +542,29 @@ document.getElementById("saveEditBtn").addEventListener("click", async () => {
     const title = document.getElementById("editQrTitle").value.trim();
     const url = document.getElementById("editQrUrl").value.trim();
 
-    if (!url) return alert("Target URL khali nahi ho sakta!");
+    if (!url) return alert("Destination URL khali nahi ho sakta!");
 
     try {
         await updateDoc(doc(db, "qrcodes", id), { title, targetUrl: url });
         window.history.back();
     } catch (err) {
-        alert("Failed to update: " + err.message);
+        alert("Update failed: " + err.message);
     }
 });
 
 window.toggleCustomerQr = async function(shortId, currentStatus) {
     await updateDoc(doc(db, "qrcodes", shortId), { active: !currentStatus });
-    loadCustomerDashboard();
+    loadUserDashboard();
 };
 
-window.downloadSavedQR = function(url, fg, bg, id) {
-    const tempCanvas = document.createElement("canvas");
-    new QRious({ element: tempCanvas, value: url, size: 300, foreground: fg, background: bg, level: "H" });
-    const link = document.createElement("a");
-    link.download = `Dynamic-QR-${id}.png`;
-    link.href = tempCanvas.toDataURL("image/png");
-    link.click();
-};
-
-// Analytics View Loader (Like Screenshot 1 & 2)
+// =========================================================
+// 5. ANALYTICS & CSV EXPORT
+// =========================================================
 async function loadCustomerAnalytics() {
     const q = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
     const snap = await getDocs(q);
 
-    let totalScans = 0;
-    let activeCodes = 0;
+    let totalScans = 0, activeCodes = 0;
     const devices = { Android: 0, iPhone: 0, Desktop: 0 };
     const times = { Morning: 0, Afternoon: 0, Evening: 0, Night: 0 };
     cachedUserQRs = [];
@@ -628,12 +575,12 @@ async function loadCustomerAnalytics() {
         totalScans += (d.scans || 0);
         if (d.active) activeCodes++;
 
-        if (d.analytics && d.analytics.devices) {
+        if (d.analytics?.devices) {
             devices.Android += (d.analytics.devices.Android || 0);
             devices.iPhone += (d.analytics.devices.iPhone || 0);
             devices.Desktop += (d.analytics.devices.Desktop || 0);
         }
-        if (d.analytics && d.analytics.timeOfDay) {
+        if (d.analytics?.timeOfDay) {
             times.Morning += (d.analytics.timeOfDay.Morning || 0);
             times.Afternoon += (d.analytics.timeOfDay.Afternoon || 0);
             times.Evening += (d.analytics.timeOfDay.Evening || 0);
@@ -644,18 +591,14 @@ async function loadCustomerAnalytics() {
     document.getElementById("analyticsTotalScans").textContent = totalScans;
     document.getElementById("analyticsActiveCodes").textContent = activeCodes;
 
-    // Render Device Breakdown Bars
-    const devBox = document.getElementById("deviceBreakdownList");
-    devBox.innerHTML = Object.entries(devices).map(([k, v]) => `
+    document.getElementById("deviceBreakdownList").innerHTML = Object.entries(devices).map(([k, v]) => `
         <div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg">
             <span class="font-semibold text-slate-700">📱 ${k}</span>
             <span class="font-extrabold text-emerald-700">${v} scans</span>
         </div>
     `).join("");
 
-    // Render Time of Day Breakdown Bars
-    const timeBox = document.getElementById("timeBreakdownList");
-    timeBox.innerHTML = Object.entries(times).map(([k, v]) => `
+    document.getElementById("timeBreakdownList").innerHTML = Object.entries(times).map(([k, v]) => `
         <div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg">
             <span class="font-semibold text-slate-700">🕒 ${k}</span>
             <span class="font-extrabold text-indigo-700">${v} scans</span>
@@ -663,42 +606,74 @@ async function loadCustomerAnalytics() {
     `).join("");
 }
 
-// Export Analytics to CSV (Like Screenshot 1 & 2)
 window.exportAnalyticsCSV = function() {
-    if (!cachedUserQRs.length) {
-        alert("Export karne ke liye koi QR data nahi hai!");
-        return;
-    }
+    if (!cachedUserQRs.length) return alert("Export karne ke liye koi QR data nahi hai!");
     let csv = "ShortID,CampaignTitle,TargetURL,TotalScans,Status\n";
     cachedUserQRs.forEach(q => {
         csv += `"${q.shortId}","${q.title}","${q.targetUrl}",${q.scans || 0},${q.active ? "Active" : "Paused"}\n`;
     });
     const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `qr-analytics-${Date.now()}.csv`;
-    a.click();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `QR-Analytics-${Date.now()}.csv`;
+    link.click();
 };
 
 // =========================================================
-// 5. UPI PAYMENT GATEWAY (9661692365@ybl)
+// 6. FIXED ₹499.00 UPI PAYMENT GATEWAY (9661692365@ybl)
 // =========================================================
-function renderUpiModalQR() {
-    const upiUri = `upi://pay?pa=${ADMIN_UPI_ID}&pn=${encodeURIComponent(ADMIN_MERCHANT_NAME)}&am=${PRO_PLAN_PRICE}&cu=INR`;
-    const canvas = document.getElementById("upiQrCanvas");
-    new QRious({
-        element: canvas,
-        value: upiUri,
-        size: 180,
-        level: "H"
-    });
+function getOfficialUpiUri() {
+    // Formatted with exact decimal 499.00 so PhonePe, GPay & Paytm display ₹499.00 immediately
+    return `upi://pay?pa=${ADMIN_UPI_ID}&pn=${encodeURIComponent(ADMIN_MERCHANT_NAME)}&am=${PRO_PLAN_PRICE}&cu=INR&tn=${encodeURIComponent("SmartQR Pro Plan")}`;
 }
+
+async function renderUpiPaymentGatewayQR() {
+    const upiUri = getOfficialUpiUri();
+    const canvas = document.getElementById("upiQrCanvas");
+    const upiStyler = new QRCodeStyling({
+        width: 240,
+        height: 240,
+        data: upiUri,
+        margin: 12,
+        qrOptions: { errorCorrectionLevel: "M" },
+        dotsOptions: { color: "#000000", type: "square" },
+        backgroundOptions: { color: "#ffffff" }
+    });
+
+    const blob = await upiStyler.getRawData("png");
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+    };
+    img.src = url;
+}
+
+window.triggerUpiAppOpen = function() {
+    const upiUri = getOfficialUpiUri();
+    window.location.href = upiUri;
+};
+
+window.copyMerchantUpi = function() {
+    navigator.clipboard.writeText(ADMIN_UPI_ID);
+    alert(`✅ UPI ID Copied: ${ADMIN_UPI_ID}\nAb aap kisi bhi UPI App me ₹499.00 pay kar sakte hain!`);
+};
+
+window.downloadUpiPaymentQr = function() {
+    const canvas = document.getElementById("upiQrCanvas");
+    const a = document.createElement("a");
+    a.download = "Pay-499-SmartQR-Pro.png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+};
 
 document.getElementById("submitUpiBtn").addEventListener("click", async () => {
     const utr = document.getElementById("upiUtrInput").value.trim();
     if (utr.length < 8) {
-        alert("Kripya sahi 12-digit UPI UTR / Reference Number dalein!");
+        alert("Kripya sahi 12-digit UTR / UPI Reference Number enter karein!");
         return;
     }
 
@@ -720,18 +695,18 @@ document.getElementById("submitUpiBtn").addEventListener("click", async () => {
         });
 
         document.getElementById("upiUtrInput").value = "";
-        alert("✅ Payment Request Submitted! Admin aapka UTR verify karke Pro Plan activate kar denge.");
+        alert("✅ ₹499.00 Payment UTR Submitted! Master Admin verify karke aapka Pro Plan activate kar denge.");
         window.history.back();
     } catch (err) {
-        alert("Error submitting UTR: " + err.message);
+        alert("Submission Error: " + err.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = "✅ Submit Payment for Activation";
+        btn.textContent = "✅ Submit ₹499 Payment for Activation";
     }
 });
 
 // =========================================================
-// 6. MASTER ADMIN CONTROL PANEL (UNHACKABLE)
+// 7. MASTER ADMIN PANEL
 // =========================================================
 async function loadMasterAdminPanel() {
     const payBox = document.getElementById("adminPaymentList");
@@ -739,10 +714,8 @@ async function loadMasterAdminPanel() {
     const qrBox = document.getElementById("adminQrList");
 
     try {
-        // 1. Load Pending UPI Payments
         const paySnap = await getDocs(collection(db, "payments"));
-        let pendingCount = 0;
-        let payHtml = "";
+        let pendingCount = 0, payHtml = "";
         paySnap.forEach(dSnap => {
             const p = dSnap.data();
             if (p.status === "pending") pendingCount++;
@@ -754,7 +727,7 @@ async function loadMasterAdminPanel() {
                     </div>
                     ${p.status === "pending" ? `
                         <button onclick="approveUpiPayment('${p.paymentId}', '${p.userId}')" class="bg-[#2e7d32] text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
-                            ✅ Approve & Activate Pro
+                            ✅ Approve ₹499 & Make PRO
                         </button>
                     ` : `<span class="text-xs font-bold text-emerald-700">✔ Approved</span>`}
                 </div>
@@ -763,7 +736,6 @@ async function loadMasterAdminPanel() {
         document.getElementById("adminPendingUpi").textContent = pendingCount;
         payBox.innerHTML = payHtml || "No UPI payment requests yet.";
 
-        // 2. Load All Registered Users
         const userSnap = await getDocs(collection(db, "users"));
         document.getElementById("adminTotalUsers").textContent = userSnap.size;
         let userHtml = "";
@@ -773,7 +745,7 @@ async function loadMasterAdminPanel() {
                 <div class="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 gap-2">
                     <div>
                         <p class="font-bold text-slate-800">${u.email}</p>
-                        <p class="text-[11px] text-slate-500">Current Plan: <strong class="uppercase text-indigo-700">${u.plan}</strong></p>
+                        <p class="text-[11px] text-slate-500">Plan: <strong class="uppercase text-indigo-700">${u.plan}</strong></p>
                     </div>
                     <div class="flex gap-1.5">
                         <button onclick="adminSetUserPlan('${u.uid}', 'pro')" class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded text-xs font-bold">Make PRO</button>
@@ -784,7 +756,6 @@ async function loadMasterAdminPanel() {
         });
         usersBox.innerHTML = userHtml || "No users found.";
 
-        // 3. Load All Platform Dynamic QRs
         const qrSnap = await getDocs(collection(db, "qrcodes"));
         document.getElementById("adminTotalQrs").textContent = qrSnap.size;
         let qrHtml = "";
@@ -794,8 +765,7 @@ async function loadMasterAdminPanel() {
                 <div class="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 gap-2">
                     <div>
                         <p class="font-bold text-slate-800">${q.title} <span class="text-[10px] font-mono bg-slate-200 px-1.5 py-0.5 rounded">${q.shortId}</span></p>
-                        <p class="text-[11px] text-slate-500 break-all">Owner: ${q.userEmail} | Scans: <strong>${q.scans || 0}</strong></p>
-                        <p class="text-[11px] text-emerald-700 break-all">${q.targetUrl}</p>
+                        <p class="text-[11px] text-slate-500">By: ${q.userEmail} | Scans: <strong>${q.scans || 0}</strong></p>
                     </div>
                     <div class="flex gap-1.5">
                         <button onclick="adminToggleQr('${q.shortId}', ${q.active})" class="px-2.5 py-1 rounded text-xs font-bold ${q.active ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
@@ -806,29 +776,21 @@ async function loadMasterAdminPanel() {
                 </div>
             `;
         });
-        qrBox.innerHTML = qrHtml || "No dynamic QR codes created yet.";
-
+        qrBox.innerHTML = qrHtml || "No dynamic QRs created yet.";
     } catch (err) {
-        alert("Admin Load Error: " + err.message);
+        console.error(err);
     }
 }
 
 window.approveUpiPayment = async function(paymentId, userId) {
-    try {
-        await updateDoc(doc(db, "payments", paymentId), { status: "approved" });
-        await updateDoc(doc(db, "users", userId), { plan: "pro" });
-        alert("🎉 Customer ka Pro Plan successfully activate ho gaya!");
-        loadMasterAdminPanel();
-    } catch (e) {
-        alert("Error: " + e.message);
-    }
+    await updateDoc(doc(db, "payments", paymentId), { status: "approved" });
+    await updateDoc(doc(db, "users", userId), { plan: "pro" });
+    alert("🎉 Customer Pro Plan Activated!");
+    loadMasterAdminPanel();
 };
 
 window.adminSetUserPlan = async function(uid, newPlan) {
-    await updateDoc(doc(db, "users", uid), { 
-        plan: newPlan,
-        trialStartMs: Date.now() // Resets 14-day timer if set to trial
-    });
+    await updateDoc(doc(db, "users", uid), { plan: newPlan, trialStartMs: Date.now() });
     loadMasterAdminPanel();
 };
 
