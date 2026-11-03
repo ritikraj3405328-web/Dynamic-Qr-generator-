@@ -35,7 +35,7 @@ const firebaseConfig = {
 };
 
 // YAHAN APNA ADMIN GMAIL DALEIN (Jo aapne Firebase Users section me add kiya hai)
-export const MASTER_ADMIN_EMAIL = "APNA_ADMIN_EMAIL@gmail.com";
+export const MASTER_ADMIN_EMAIL = "mehtaprem362@gmail.com";
 
 // Aapka UPI Payment Configuration
 export const ADMIN_UPI_ID = "9661692365@ybl";
