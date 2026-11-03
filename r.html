@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div id="statusBox" class="text-center space-y-2">
+        <div class="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>
+        <p id="statusText" class="text-sm text-slate-300 font-medium">Redirecting to destination...</p>
+    </div>
+
+    <script type="module">
+        import { db, doc, getDoc, updateDoc, increment, serverTimestamp } from "./firebase-config.js";
+
+        async function processRedirect() {
+            const params = new URLSearchParams(window.location.search);
+            const shortId = params.get("id");
+            const statusText = document.getElementById("statusText");
+
+            if (!shortId) {
+                statusText.textContent = "Invalid QR Link!";
+                return;
+            }
+
+            try {
+                const qrRef = doc(db, "qrcodes", shortId);
+                const qrSnap = await getDoc(qrRef);
+
+                if (!qrSnap.exists()) {
+                    statusText.textContent = "QR Code not found or deleted!";
+                    return;
+                }
+
+                const data = qrSnap.data();
+
+                if (!data.active) {
+                    statusText.textContent = "⚠️ This QR Code link has been paused by the owner or admin.";
+                    return;
+                }
+
+                // Scan Count +1 update karein
+                await updateDoc(qrRef, {
+                    scans: increment(1),
+                    lastScannedAt: serverTimestamp()
+                });
+
+                // Agar URL me http/https nahi hai toh laga dein
+                let target = data.targetUrl;
+                if (!/^https?:\/\//i.test(target)) {
+                    target = "https://" + target;
+                }
+
+                // window.location.replace use kiya hai taaki Back button dabane par redirect loop na bane
+                window.location.replace(target);
+
+            } catch (err) {
+                statusText.textContent = "Error loading link: " + err.message;
+            }
+        }
+
+        processRedirect();
+    </script>
+</body>
+</html>
