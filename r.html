@@ -2,38 +2,220 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartQR Hub & Redirector</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartQR Pro — Fast Link & Digital Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        /* Full-Screen Mobile App Container */
+        .app-shell {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 28px;
+            padding: 26px 22px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(16px);
+            text-align: center;
+            animation: popIn 0.22s ease-out;
+        }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.96) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .brand-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            color: #93c5fd;
+            margin-bottom: 18px;
+        }
+        .brand-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+        /* Fast Loader Spinner */
+        .spinner-wrap {
+            display: flex;
+            justify-content: center;
+            margin: 22px 0;
+        }
+        .spinner {
+            width: 54px;
+            height: 54px;
+            border: 5px solid rgba(59, 130, 246, 0.25);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.65s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Large Readable Typography */
+        .hero-avatar {
+            width: 76px;
+            height: 76px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #2563eb, #10b981);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin: 0 auto 14px auto;
+            box-shadow: 0 12px 25px rgba(37, 99, 235, 0.35);
+        }
+        .main-title {
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1.25;
+            color: #ffffff;
+            margin-bottom: 6px;
+            word-break: break-word;
+        }
+        .sub-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 20px;
+            line-height: 1.45;
+        }
+
+        /* Info & Details Box */
+        .info-card {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 18px;
+            text-align: left;
+            margin-bottom: 18px;
+        }
+        .info-row {
+            margin-bottom: 14px;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #f1f5f9;
+        }
+        .info-row:last-child { margin-bottom: 0; }
+        .info-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #38bdf8;
+            margin-bottom: 3px;
+        }
+        .product-badge {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.18);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+            font-size: 15px;
+            font-weight: 800;
+            padding: 7px 14px;
+            border-radius: 12px;
+            margin: 4px 6px 2px 0;
+        }
+
+        /* Huge Touch-Friendly Action Buttons */
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+        .big-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 17px 20px;
+            border-radius: 18px;
+            font-size: 17px;
+            font-weight: 800;
+            text-decoration: none;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        .big-btn:active { transform: scale(0.98); }
+        .btn-whatsapp { background: linear-gradient(135deg, #16a34a, #059669); }
+        .btn-call { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        .btn-insta { background: linear-gradient(135deg, #9333ea, #ec4899, #f97316); }
+        .btn-youtube { background: linear-gradient(135deg, #dc2626, #991b1b); }
+        .btn-dark {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            font-size: 15px;
+            padding: 14px 18px;
+        }
+        .footer-cta {
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .footer-link {
+            display: inline-block;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .hidden { display: none !important; }
+    </style>
 </head>
-<body class="bg-[#0f172a] text-white min-h-screen flex flex-col items-center justify-center p-4">
+<body>
 
-    <!-- Smart Resolver Card -->
-    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-4">
-        
-        <div class="flex items-center justify-center gap-2 mb-1">
-            <div class="grid grid-cols-2 gap-0.5 w-5 h-5">
-                <span class="bg-blue-500 rounded-2xs"></span><span class="bg-white rounded-2xs"></span>
-                <span class="bg-white rounded-2xs"></span><span class="bg-emerald-500 rounded-2xs"></span>
-            </div>
-            <span class="font-extrabold text-xs tracking-tight text-slate-200">SMART QR PRO</span>
+    <div class="app-shell">
+        <div class="brand-pill">
+            <span class="brand-dot"></span>
+            <span>SMART QR PRO VERIFIED</span>
         </div>
 
-        <div id="spinnerBox" class="flex justify-center py-4">
-            <div class="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <div id="heroAvatar" class="hero-avatar hidden">🏪</div>
+
+        <!-- Fast Spinner -->
+        <div id="spinnerBox" class="spinner-wrap">
+            <div class="spinner"></div>
         </div>
 
-        <h1 id="statusTitle" class="text-lg font-extrabold text-white">Opening QR Content...</h1>
-        <p id="statusSub" class="text-xs text-slate-400">Fast & secure dynamic QR resolution</p>
+        <h1 id="statusTitle" class="main-title">Opening Link...</h1>
+        <p id="statusSub" class="sub-title">Connecting in 0.1s via SmartQR Engine</p>
 
-        <!-- Dynamic Interactive Card (For VCard, UPI, Wi-Fi, Social Hub, Visiting Card, Text) -->
-        <div id="dynamicContainer" class="hidden text-left space-y-3 pt-2"></div>
+        <!-- Dynamic Content Container -->
+        <div id="dynamicContainer" class="hidden"></div>
 
-        <div id="actionBox" class="hidden pt-3 border-t border-slate-800">
-            <a href="./index.html" class="inline-block w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2.5 px-4 rounded-xl transition text-center">
-                ⚡ Create Your Own Dynamic QR Code
+        <!-- Footer Promo -->
+        <div id="actionBox" class="footer-cta hidden">
+            <a href="./index.html" class="footer-link">
+                ⚡ Create Your Own Dynamic QR & Business Page
             </a>
         </div>
     </div>
@@ -56,17 +238,22 @@
             return "Night";
         }
 
-        function showCardView(title, subtitle, innerHtml) {
+        function showBigScreenView(iconEmoji, title, subtitle, bodyHtml) {
             document.getElementById("spinnerBox").classList.add("hidden");
+            const av = document.getElementById("heroAvatar");
+            if (iconEmoji) {
+                av.textContent = iconEmoji;
+                av.classList.remove("hidden");
+            }
             document.getElementById("statusTitle").textContent = title;
             document.getElementById("statusSub").textContent = subtitle;
             const cont = document.getElementById("dynamicContainer");
-            cont.innerHTML = innerHtml;
+            cont.innerHTML = bodyHtml;
             cont.classList.remove("hidden");
             document.getElementById("actionBox").classList.remove("hidden");
         }
 
-        // Helper to Download .vcf File so Mobile Phonebook Opens Immediately
+        // Download .vcf Contact File
         window.downloadVcfFile = function(vcfString, fileName) {
             const blob = new Blob([vcfString], { type: "text/vcard;charset=utf-8" });
             const url = URL.createObjectURL(blob);
@@ -76,70 +263,143 @@
             a.click();
         };
 
-        window.copyTextHelper = function(txt, label) {
+        window.copyTextFast = function(txt, label) {
             navigator.clipboard.writeText(txt);
-            alert(`✅ ${label} Copied: ${txt}`);
+            alert(`✅ ${label} Copied:\n${txt}`);
         };
 
-        function renderSocialHubUI(hubData) {
-            let linksHtml = "";
-            if (hubData.ig) linksHtml += `<a href="${hubData.ig}" target="_blank" class="block w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs py-3.5 px-4 rounded-xl text-center shadow">📸 Follow on Instagram</a>`;
-            if (hubData.yt) linksHtml += `<a href="${hubData.yt}" target="_blank" class="block w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-3.5 px-4 rounded-xl text-center shadow">▶️ Subscribe on YouTube</a>`;
-            if (hubData.wa) linksHtml += `<a href="https://wa.me/${hubData.wa.replace(/\D/g, '')}" target="_blank" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 px-4 rounded-xl text-center shadow">💬 Chat on WhatsApp</a>`;
-            if (hubData.wb) linksHtml += `<a href="${hubData.wb}" target="_blank" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3.5 px-4 rounded-xl text-center shadow">🌐 Visit Official Website</a>`;
-            showCardView(hubData.t || "Social Media Hub", "Connect with us on our official channels:", linksHtml || "<p class='text-xs text-center text-slate-400'>No links configured.</p>");
+        window.shareCurrentPage = function(title) {
+            if (navigator.share) {
+                navigator.share({ title: title, url: window.location.href }).catch(() => {});
+            } else {
+                window.copyTextFast(window.location.href, "Page Link");
+            }
+        };
+
+        // Render Big Full-Screen Digital Visiting Card
+        function renderBigVisitingCard(shopName, shopPhone, shopAddr, shopItems) {
+            const cleanPhone = (shopPhone || "").replace(/\D/g, "");
+            const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+            const waMsg = encodeURIComponent(`Hello ${shopName}, I scanned your Digital Visiting Card QR and want to inquire about: ${shopItems || "your products"}.`);
+
+            const itemsArray = (shopItems || "General Products & Services")
+                .split(",")
+                .map(s => s.trim())
+                .filter(Boolean);
+
+            const badgesHtml = itemsArray.map(item => `<span class="product-badge">📦 ${item}</span>`).join("");
+
+            // Auto-create VCard string so customer can also save shop to Phonebook
+            window.shopVcfData = [
+                "BEGIN:VCARD",
+                "VERSION:3.0",
+                `FN:${shopName}`,
+                `ORG:${shopName}`,
+                cleanPhone ? `TEL;TYPE=CELL:+${waPhone}` : "",
+                shopAddr ? `ADR;TYPE=WORK:;;${shopAddr};;;;` : "",
+                "END:VCARD"
+            ].filter(Boolean).join("\n");
+
+            showBigScreenView(
+                "🏪",
+                shopName || "Official Business Store",
+                "Verified Digital Visiting Card & Order Hub",
+                `
+                <div class="info-card">
+                    <div class="info-row">
+                        <span class="info-label">📍 Shop Address / Location</span>
+                        <strong>${shopAddr || "Contact us for location details"}</strong>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">🛍️ Available Products & Services</span>
+                        <div style="margin-top:6px;">${badgesHtml}</div>
+                    </div>
+                    ${shopPhone ? `
+                    <div class="info-row">
+                        <span class="info-label">📞 Direct Contact Number</span>
+                        <strong>+91 ${cleanPhone.slice(-10)}</strong>
+                    </div>` : ""}
+                </div>
+
+                <div class="btn-stack">
+                    <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="big-btn btn-whatsapp">
+                        <span>💬</span><span>Order / Chat on WhatsApp</span>
+                    </a>
+                    ${cleanPhone ? `
+                    <a href="tel:+${waPhone}" class="big-btn btn-call">
+                        <span>📞</span><span>Call Now (${cleanPhone.slice(-10)})</span>
+                    </a>` : ""}
+                    <button onclick="downloadVcfFile(window.shopVcfData, '${(shopName || "Shop").replace(/'/g, "")}')" class="big-btn btn-dark">
+                        <span>📥</span><span>Save Shop to Phonebook</span>
+                    </button>
+                    <button onclick="shareCurrentPage('${(shopName || "Shop").replace(/'/g, "")}')" class="big-btn btn-dark">
+                        <span>🔗</span><span>Share Visiting Card</span>
+                    </button>
+                </div>
+                `
+            );
         }
 
-        async function resolveQrScan() {
+        // Render Big Full-Screen Social Media Hub
+        function renderBigSocialHub(hub) {
+            let btns = "";
+            if (hub.ig) {
+                btns += `<a href="${hub.ig}" target="_blank" class="big-btn btn-insta"><span>📸</span><span>Follow on Instagram</span></a>`;
+            }
+            if (hub.yt) {
+                btns += `<a href="${hub.yt}" target="_blank" class="big-btn btn-youtube"><span>▶️</span><span>Subscribe on YouTube</span></a>`;
+            }
+            if (hub.wa) {
+                const cleanWa = hub.wa.replace(/\D/g, "");
+                const fullWa = cleanWa.length === 10 ? `91${cleanWa}` : cleanWa;
+                btns += `<a href="https://wa.me/${fullWa}" target="_blank" class="big-btn btn-whatsapp"><span>💬</span><span>Chat on WhatsApp</span></a>`;
+            }
+            if (hub.wb) {
+                const webUrl = /^https?:\/\//i.test(hub.wb) ? hub.wb : `https://${hub.wb}`;
+                btns += `<a href="${webUrl}" target="_blank" class="big-btn btn-call"><span>🌐</span><span>Visit Official Website</span></a>`;
+            }
+
+            showBigScreenView(
+                "🌟",
+                hub.t || "Official Social Hub",
+                "Connect with us on our official channels below:",
+                `<div class="btn-stack">${btns || "<p class='sub-title'>No social links added yet.</p>"}</div>`
+            );
+        }
+
+        async function initFastResolver() {
             const params = new URLSearchParams(window.location.search);
             const shortId = params.get("id");
             const hubEncoded = params.get("hub");
             const cardEncoded = params.get("card");
 
-            // 1. Direct Social Hub QR
+            // 1. Direct Encoded Social Hub
             if (hubEncoded) {
                 try {
                     const hubData = JSON.parse(decodeURIComponent(atob(hubEncoded)));
-                    renderSocialHubUI(hubData);
+                    renderBigSocialHub(hubData);
                     return;
                 } catch (e) {
-                    showCardView("⚠️ Invalid Hub Link", "Could not decode Social Hub.", "");
+                    showBigScreenView("⚠️", "Invalid Social Link", "Could not decode Social Hub data.", "");
                     return;
                 }
             }
 
-            // 2. Shopkeeper Digital Visiting Card QR
+            // 2. Direct Encoded Visiting Card
             if (cardEncoded) {
                 try {
-                    const card = JSON.parse(decodeURIComponent(atob(cardEncoded)));
-                    const cleanPhone = (card.p || "").replace(/\D/g, "");
-                    const waMsg = encodeURIComponent(`Hello ${card.n}, I scanned your QR Code and want to inquire about your products.`);
-                    showCardView(
-                        card.n || "Digital Business Card",
-                        card.a || "Verified Local Business",
-                        `
-                        <div class="bg-slate-800 p-4 rounded-2xl space-y-2 border border-slate-700 text-xs">
-                            <p><strong class="text-slate-400">📍 Address:</strong> ${card.a || "Available on request"}</p>
-                            <p><strong class="text-slate-400">📦 Products / Services:</strong> ${card.items || "All general items"}</p>
-                        </div>
-                        <a href="https://wa.me/${cleanPhone}?text=${waMsg}" target="_blank" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3.5 rounded-xl text-center shadow">
-                            💬 Order / Chat on WhatsApp (${card.p})
-                        </a>
-                        <a href="tel:${cleanPhone}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl text-center">
-                            📞 Call Now
-                        </a>
-                        `
-                    );
+                    const c = JSON.parse(decodeURIComponent(atob(cardEncoded)));
+                    renderBigVisitingCard(c.n, c.p, c.a, c.items);
                     return;
                 } catch (e) {
-                    showCardView("⚠️ Invalid Visiting Card", "Could not load shop details.", "");
+                    showBigScreenView("⚠️", "Invalid Visiting Card", "Could not load business details.", "");
                     return;
                 }
             }
 
-            // 3. Dynamic QR Code (Firestore Lookup)
+            // 3. Firestore Short-Link Lookup (?id=xxxxx)
             if (!shortId) {
-                showCardView("⚠️ Invalid QR Link", "No QR ID found in URL.", "");
+                showBigScreenView("⚠️", "Invalid QR Code", "No valid tracking ID found in this QR link.", "");
                 return;
             }
 
@@ -148,36 +408,55 @@
                 const qrSnap = await getDoc(qrRef);
 
                 if (!qrSnap.exists()) {
-                    showCardView("❌ QR Code Deleted", "Yeh Dynamic QR code owner dwara delete kiya ja chuka hai.", "");
+                    showBigScreenView("❌", "QR Link Not Found", "Yeh Dynamic QR code owner dwara delete kiya ja chuka hai.", "");
                     return;
                 }
 
                 const data = qrSnap.data();
 
                 if (!data.active) {
-                    showCardView("⏸️ QR Code Paused", "Is QR Code ke owner ne filhal is link ko pause kar rakha hai.", "");
+                    showBigScreenView("⏸️", "QR Link Paused", "Is QR Code ke owner ne filhal is link ko rok (pause) rakha hai.", "");
                     return;
                 }
 
-                // Increment Real-Time Scan Analytics
+                // Fire Analytics Update in Background (Max 220ms wait for URL redirects so it never lags!)
                 const device = detectDevice();
                 const timeSlot = detectTimeSlot();
-                try {
-                    await updateDoc(qrRef, {
-                        scans: increment(1),
-                        lastScannedAt: serverTimestamp(),
-                        [`analytics.devices.${device}`]: increment(1),
-                        [`analytics.timeOfDay.${timeSlot}`]: increment(1)
-                    });
-                } catch (e) {
-                    console.warn("Analytics skip:", e);
-                }
+                const analyticsPromise = updateDoc(qrRef, {
+                    scans: increment(1),
+                    lastScannedAt: serverTimestamp(),
+                    [`analytics.devices.${device}`]: increment(1),
+                    [`analytics.timeOfDay.${timeSlot}`]: increment(1)
+                }).catch(() => {});
 
                 const qrType = data.qrType || "url";
                 const s = data.structuredData || {};
                 const target = (data.targetUrl || "").trim();
 
-                // HANDLE DYNAMIC TYPE 1: VCARD DIGITAL CONTACT CARD
+                // TYPE A: SHOPKEEPER DIGITAL VISITING CARD (Short-Link Version!)
+                if (qrType === "visiting" || target.startsWith("VISITING_CARD:")) {
+                    renderBigVisitingCard(
+                        s.shopName || data.title,
+                        s.shopPhone || "",
+                        s.shopAddr || "",
+                        s.shopItems || ""
+                    );
+                    return;
+                }
+
+                // TYPE B: SOCIAL MEDIA HUB (Short-Link Version!)
+                if (qrType === "social" || target.startsWith("SOCIAL_HUB:")) {
+                    renderBigSocialHub({
+                        t: s.socTitle || data.title,
+                        ig: s.socInsta,
+                        yt: s.socYt,
+                        wa: s.socWa,
+                        wb: s.socWeb
+                    });
+                    return;
+                }
+
+                // TYPE C: VCARD DIGITAL CONTACT CARD
                 if (qrType === "vcard" || target.startsWith("BEGIN:VCARD")) {
                     const name = s.vcName || data.title || "Business Contact";
                     const phone = s.vcPhone || "";
@@ -188,99 +467,116 @@
 
                     window.currentVcfPayload = target;
 
-                    showCardView(
-                        `🪪 ${name}`,
-                        org || "Digital Contact Card",
+                    showBigScreenView(
+                        "🪪",
+                        name,
+                        org || "Verified Digital Contact Card",
                         `
-                        <div class="bg-slate-800 p-4 rounded-2xl space-y-2 border border-slate-700 text-xs">
-                            ${phone ? `<p><strong>📞 Mobile:</strong> <a href="tel:${phone}" class="text-blue-400 underline">${phone}</a></p>` : ""}
-                            ${email ? `<p><strong>✉️ Email:</strong> <a href="mailto:${email}" class="text-blue-400 underline">${email}</a></p>` : ""}
-                            ${org ? `<p><strong>🏢 Company:</strong> ${org}</p>` : ""}
-                            ${addr ? `<p><strong>📍 Address:</strong> ${addr}</p>` : ""}
-                            ${web ? `<p><strong>🌐 Website:</strong> <a href="${web}" target="_blank" class="text-blue-400 underline">${web}</a></p>` : ""}
+                        <div class="info-card">
+                            ${phone ? `<div class="info-row"><span class="info-label">📞 Mobile Number</span><strong>${phone}</strong></div>` : ""}
+                            ${email ? `<div class="info-row"><span class="info-label">✉️ Email Address</span><strong>${email}</strong></div>` : ""}
+                            ${org ? `<div class="info-row"><span class="info-label">🏢 Company / Organization</span><strong>${org}</strong></div>` : ""}
+                            ${addr ? `<div class="info-row"><span class="info-label">📍 Address</span><strong>${addr}</strong></div>` : ""}
+                            ${web ? `<div class="info-row"><span class="info-label">🌐 Website</span><strong>${web}</strong></div>` : ""}
                         </div>
-                        <button onclick="downloadVcfFile(window.currentVcfPayload, '${name.replace(/'/g, "")}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3.5 rounded-xl shadow flex items-center justify-center gap-2">
-                            <span>📥</span><span>Save Contact to Phonebook</span>
-                        </button>
-                        ${phone ? `<a href="tel:${phone}" class="block w-full bg-emerald-600 text-white font-extrabold text-xs py-3 rounded-xl text-center">📞 Call ${name}</a>` : ""}
+                        <div class="btn-stack">
+                            <button onclick="downloadVcfFile(window.currentVcfPayload, '${name.replace(/'/g, "")}')" class="big-btn btn-call">
+                                <span>📥</span><span>Save Contact to Phonebook</span>
+                            </button>
+                            ${phone ? `<a href="tel:${phone}" class="big-btn btn-whatsapp"><span>📞</span><span>Call ${name}</span></a>` : ""}
+                        </div>
                         `
                     );
                     return;
                 }
 
-                // HANDLE DYNAMIC TYPE 2: UPI PAYMENT
+                // TYPE D: UPI PAYMENT
                 if (qrType === "upi" || /^upi:\/\/pay/i.test(target)) {
                     const upiId = s.upiId || (new URLSearchParams(target.split("?")[1] || "").get("pa")) || "";
                     const payee = s.upiName || data.title || "Merchant";
                     const amt = s.upiAmount || (new URLSearchParams(target.split("?")[1] || "").get("am")) || "";
 
-                    // Attempt automatic UPI App trigger on mobile
-                    setTimeout(() => { window.location.href = target; }, 300);
+                    setTimeout(() => { window.location.href = target; }, 250);
 
-                    showCardView(
-                        `₹ Pay to ${payee}`,
-                        "Verified UPI Payment QR",
+                    showBigScreenView(
+                        "₹",
+                        `Pay to ${payee}`,
+                        "Verified Direct UPI Payment",
                         `
-                        <div class="bg-emerald-950/60 border border-emerald-700/50 rounded-2xl p-4 text-center space-y-1">
-                            <p class="text-[11px] text-emerald-300">UPI ID</p>
-                            <p class="text-sm font-mono font-extrabold text-white">${upiId}</p>
-                            ${amt ? `<p class="text-2xl font-black text-emerald-400 pt-1">₹${amt}</p>` : `<p class="text-xs text-slate-400">Enter amount in your UPI app</p>`}
+                        <div class="info-card" style="text-align:center;">
+                            <span class="info-label">MERCHANT UPI ID</span>
+                            <p style="font-size:20px;font-weight:900;font-family:monospace;margin:6px 0;">${upiId}</p>
+                            ${amt ? `<p style="font-size:34px;font-weight:900;color:#10b981;margin-top:8px;">₹${amt}</p>` : ""}
                         </div>
-                        <a href="${target}" class="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3.5 rounded-xl text-center shadow-lg">
-                            📱 Open GPay / PhonePe / Paytm
-                        </a>
-                        <button onclick="copyTextHelper('${upiId}', 'UPI ID')" class="w-full bg-slate-800 text-slate-200 font-bold text-xs py-3 rounded-xl">
-                            📋 Copy UPI ID
-                        </button>
+                        <div class="btn-stack">
+                            <a href="${target}" class="big-btn btn-whatsapp">
+                                <span>📱</span><span>Open GPay / PhonePe / Paytm</span>
+                            </a>
+                            <button onclick="copyTextFast('${upiId}', 'UPI ID')" class="big-btn btn-dark">
+                                <span>📋</span><span>Copy UPI ID</span>
+                            </button>
+                        </div>
                         `
                     );
                     return;
                 }
 
-                // HANDLE DYNAMIC TYPE 3: WI-FI AUTO CONNECT
+                // TYPE E: WI-FI AUTO CONNECT
                 if (qrType === "wifi" || target.startsWith("WIFI:")) {
                     const ssid = s.wifiSsid || "Wi-Fi Network";
                     const pass = s.wifiPass || "";
                     const enc = s.wifiEnc || "WPA";
 
-                    showCardView(
-                        `📶 Wi-Fi: ${ssid}`,
-                        `Security: ${enc}`,
+                    showBigScreenView(
+                        "📶",
+                        ssid,
+                        `Wi-Fi Network (${enc})`,
                         `
-                        <div class="bg-slate-800 p-4 rounded-2xl space-y-2 border border-slate-700 text-xs">
-                            <p><strong>Network Name (SSID):</strong> <span class="text-blue-400 font-mono">${ssid}</span></p>
-                            <p><strong>Password:</strong> <span class="text-emerald-400 font-mono">${pass || "No Password"}</span></p>
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-label">📶 Network Name (SSID)</span>
+                                <strong style="font-size:20px;">${ssid}</strong>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">🔑 Wi-Fi Password</span>
+                                <strong style="font-size:22px;color:#10b981;font-family:monospace;">${pass || "No Password Required"}</strong>
+                            </div>
                         </div>
                         ${pass ? `
-                            <button onclick="copyTextHelper('${pass.replace(/'/g, "")}', 'Wi-Fi Password')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3.5 rounded-xl shadow">
-                                📋 Copy Wi-Fi Password
+                        <div class="btn-stack">
+                            <button onclick="copyTextFast('${pass.replace(/'/g, "")}', 'Wi-Fi Password')" class="big-btn btn-call">
+                                <span>📋</span><span>Copy Wi-Fi Password</span>
                             </button>
-                        ` : ""}
+                        </div>` : ""}
                         `
                     );
                     return;
                 }
 
-                // HANDLE DYNAMIC TYPE 4: PLAIN TEXT / NOTICE
+                // TYPE F: PLAIN TEXT / NOTICE (Big Readable Card)
                 if (qrType === "text") {
-                    showCardView(
-                        data.title || "📝 QR Message",
-                        "Plain Text Content",
+                    const textContent = s.rawSingle || target;
+                    showBigScreenView(
+                        "📝",
+                        data.title || "Digital Notice / Text",
+                        "Scanned Message Content",
                         `
-                        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-xs leading-relaxed whitespace-pre-wrap break-words">${target}</div>
-                        <button onclick="copyTextHelper(\`${target.replace(/`/g, "")}\`, 'Text')" class="w-full bg-blue-600 text-white font-extrabold text-xs py-3 rounded-xl">
-                            📋 Copy Text
-                        </button>
+                        <div class="info-card" style="font-size:18px;line-height:1.65;white-space:pre-wrap;word-break:break-word;font-weight:600;">${textContent}</div>
+                        <div class="btn-stack">
+                            <button onclick="copyTextFast(\`${textContent.replace(/`/g, "")}\`, 'Message')" class="big-btn btn-call">
+                                <span>📋</span><span>Copy Full Text</span>
+                            </button>
+                        </div>
                         `
                     );
                     return;
                 }
 
-                // HANDLE DYNAMIC TYPE 5: SOCIAL HUB OR DIRECT REDIRECT (URL / WHATSAPP / PHONE)
-                if (target.includes("r.html?hub=")) {
-                    window.location.replace(target);
-                    return;
-                }
+                // TYPE G: WEBSITE URL / WHATSAPP / PHONE CALL (Ultra-Fast Instant Redirect!)
+                await Promise.race([
+                    analyticsPromise,
+                    new Promise(res => setTimeout(res, 220)) // Never wait more than 0.22s before redirecting!
+                ]);
 
                 let finalUrl = target;
                 if (!/^(https?:\/\/|tel:|mailto:|upi:\/\/)/i.test(finalUrl)) {
@@ -289,11 +585,11 @@
                 window.location.replace(finalUrl);
 
             } catch (err) {
-                showCardView("⚠️ Connection Error", err.message, "");
+                showBigScreenView("⚠️", "Connection Error", err.message, "");
             }
         }
 
-        resolveQrScan();
+        initFastResolver();
     </script>
 </body>
 </html>
