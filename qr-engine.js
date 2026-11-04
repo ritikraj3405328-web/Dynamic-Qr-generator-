@@ -1,13 +1,132 @@
 // qr-engine.js
-// Complete Jotform-Style 8-Frame Custom QR Studio, Hex Color Sync, 1:1 Logo & Bulk ZIP Engine
+// Complete 8 Artistic Themes, Unique Dots & Eyes, Scenic Art Poster, 1:1 Logo & Styled Bulk CSV ZIP Engine
 
 let currentQRType = "url";
-let currentFrameId = 1; // 1 to 8 (Matches Jotform 8 Frame Cards)
+let currentThemeKey = "elegant";
+let currentFrameId = 1; // 1 to 8
 let currentDotStyle = "square";
+let currentEyeOuter = "extra-rounded";
+let currentEyeInner = "dot";
 let uploadedLogoDataUrl = null;
 let renderTimer = null;
 
-// Initialize High-Resolution Base QR Generator
+// 8 Pre-Configured Artistic Themes Dictionary
+const ARTISTIC_THEMES = {
+    elegant: {
+        name: "Elegant Simplicity",
+        useGradient: true,
+        color1: "#0f172a",
+        color2: "#334155",
+        eyeColor: "#0f172a",
+        bgColor: "#ffffff",
+        textColor: "#0f172a",
+        dotStyle: "classy-rounded",
+        eyeOuter: "extra-rounded",
+        eyeInner: "dot",
+        frameId: 1,
+        fontFamily: "Inter"
+    },
+    nature: {
+        name: "Nature Inspired",
+        useGradient: true,
+        color1: "#065f46",
+        color2: "#10b981",
+        eyeColor: "#047857",
+        bgColor: "#f0fdf4",
+        textColor: "#065f46",
+        dotStyle: "extra-rounded",
+        eyeOuter: "dot",
+        eyeInner: "dot",
+        frameId: 2,
+        fontFamily: "Inter"
+    },
+    romantic: {
+        name: "Soft & Romantic",
+        useGradient: true,
+        color1: "#e11d48",
+        color2: "#fb7185",
+        eyeColor: "#be123c",
+        bgColor: "#fff1f2",
+        textColor: "#be123c",
+        dotStyle: "dots",
+        eyeOuter: "dot",
+        eyeInner: "dot",
+        frameId: 6,
+        fontFamily: "Pacifico"
+    },
+    luxe: {
+        name: "Luxe Golden Touch",
+        useGradient: true,
+        color1: "#92400e",
+        color2: "#d97706",
+        eyeColor: "#78350f",
+        bgColor: "#fffbeb",
+        textColor: "#78350f",
+        dotStyle: "classy",
+        eyeOuter: "square",
+        eyeInner: "square",
+        frameId: 3,
+        fontFamily: "Playfair Display"
+    },
+    electric: {
+        name: "Electric Vibes",
+        useGradient: true,
+        color1: "#7c3aed",
+        color2: "#ec4899",
+        eyeColor: "#4f46e5",
+        bgColor: "#ffffff",
+        textColor: "#6d28d9",
+        dotStyle: "dots",
+        eyeOuter: "extra-rounded",
+        eyeInner: "dot",
+        frameId: 2,
+        fontFamily: "Pacifico"
+    },
+    minimal: {
+        name: "Minimalist Cool",
+        useGradient: true,
+        color1: "#0284c7",
+        color2: "#2563eb",
+        eyeColor: "#0369a1",
+        bgColor: "#f8fafc",
+        textColor: "#0f172a",
+        dotStyle: "rounded",
+        eyeOuter: "extra-rounded",
+        eyeInner: "dot",
+        frameId: 4,
+        fontFamily: "Inter"
+    },
+    playful: {
+        name: "Bold & Playful",
+        useGradient: true,
+        color1: "#ea580c",
+        color2: "#2563eb",
+        eyeColor: "#db2777",
+        bgColor: "#ffffff",
+        textColor: "#db2777",
+        dotStyle: "dots",
+        eyeOuter: "dot",
+        eyeInner: "dot",
+        frameId: 5,
+        fontFamily: "Inter"
+    },
+    scenic: {
+        name: "Scenic Mountain Art",
+        useGradient: true,
+        color1: "#115e59",
+        color2: "#0f172a",
+        eyeColor: "#be123c",
+        bgColor: "#fff7ed",
+        textColor: "#134e4a",
+        dotStyle: "rounded",
+        eyeOuter: "extra-rounded",
+        eyeInner: "dot",
+        frameId: 8,
+        fontFamily: "Playfair Display"
+    }
+};
+
+// Base High-Resolution QRCodeStyling Instance
 const qrStyler = new QRCodeStyling({
     width: 500,
     height: 500,
@@ -17,7 +136,7 @@ const qrStyler = new QRCodeStyling({
     qrOptions: {
         typeNumber: 0,
         mode: "Byte",
-        errorCorrectionLevel: "M" // Fast scan default; auto-switches to 'H' with Logo
+        errorCorrectionLevel: "M"
     },
     imageOptions: {
         hideBackgroundDots: true,
@@ -26,54 +145,120 @@ const qrStyler = new QRCodeStyling({
         crossOrigin: "anonymous"
     },
     dotsOptions: {
-        color: "#000000",
-        type: "square"
+        color: "#0f172a",
+        type: "classy-rounded"
     },
     backgroundOptions: {
         color: "#ffffff"
     },
     cornersSquareOptions: {
-        color: "#000000",
-        type: "square"
+        color: "#0f172a",
+        type: "extra-rounded"
     },
     cornersDotOptions: {
-        color: "#000000",
-        type: "square"
+        color: "#0f172a",
+        type: "dot"
     }
 });
 
 // =========================================================
-// 1. SEARCH & SWITCH BETWEEN 8 QR CONTENT TYPES
+// 1. STUDIO 6-TAB NAVIGATION & 8 ARTISTIC THEMES
+// =========================================================
+window.openStudioPanel = function(panelName) {
+    const panels = ["themes", "dots", "frames", "colors", "logo", "text"];
+    panels.forEach(p => {
+        document.getElementById(`studio-panel-${p}`)?.classList.add("hidden");
+        document.getElementById(`st-tab-${p}`)?.classList.remove("studio-tab-active");
+    });
+
+    document.getElementById(`studio-panel-${panelName}`)?.classList.remove("hidden");
+    document.getElementById(`st-tab-${panelName}`)?.classList.add("studio-tab-active");
+};
+
+window.applyArtisticTheme = function(themeKey) {
+    const t = ARTISTIC_THEMES[themeKey];
+    if (!t) return;
+    currentThemeKey = themeKey;
+
+    // Highlight active theme card
+    document.querySelectorAll(".theme-card").forEach(btn => btn.classList.remove("theme-card-active"));
+    document.getElementById(`theme-${themeKey}`)?.classList.add("theme-card-active");
+
+    const badge = document.getElementById("activeStyleBadge");
+    if (badge) badge.textContent = `Theme: ${t.name}`;
+
+    // Populate Controls with Theme Settings
+    document.getElementById("useGradientToggle").checked = t.useGradient;
+    document.getElementById("fgColor").value = t.color1;
+    document.getElementById("fgColorHex").value = t.color1.toUpperCase();
+    document.getElementById("gradColor2").value = t.color2;
+    document.getElementById("gradColor2Hex").value = t.color2.toUpperCase();
+    document.getElementById("eyeColor").value = t.eyeColor;
+    document.getElementById("eyeColorHex").value = t.eyeColor.toUpperCase();
+    document.getElementById("bgColor").value = t.bgColor;
+    document.getElementById("bgColorHex").value = t.bgColor.toUpperCase();
+    document.getElementById("frameTextColor").value = t.textColor;
+    document.getElementById("textColorHex").value = t.textColor.toUpperCase();
+    document.getElementById("qrFontFamily").value = t.fontFamily;
+
+    currentEyeOuter = t.eyeOuter;
+    currentEyeInner = t.eyeInner;
+    document.getElementById("eyeOuterSelect").value = t.eyeOuter;
+    document.getElementById("eyeInnerSelect").value = t.eyeInner;
+
+    window.setDotPattern(t.dotStyle, false);
+    window.selectJotformFrame(t.frameId, false);
+
+    triggerLivePreview();
+};
+
+window.setDotPattern = function(pattern, shouldRender = true) {
+    currentDotStyle = pattern;
+    document.querySelectorAll(".dot-btn").forEach(btn => {
+        btn.className = "dot-btn py-2.5 px-2 rounded-xl border border-slate-300 bg-white text-slate-700";
+    });
+    const active = document.getElementById(`dot-${pattern}`);
+    if (active) {
+        active.className = "dot-btn py-2.5 px-2 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-extrabold";
+    }
+    if (shouldRender) triggerLivePreview();
+};
+
+window.updateEyesStyle = function() {
+    currentEyeOuter = document.getElementById("eyeOuterSelect")?.value || "extra-rounded";
+    currentEyeInner = document.getElementById("eyeInnerSelect")?.value || "dot";
+    triggerLivePreview();
+};
+
+window.selectJotformFrame = function(frameNum, shouldRender = true) {
+    currentFrameId = frameNum;
+    document.querySelectorAll(".frame-card").forEach(card => card.classList.remove("frame-card-active"));
+    document.getElementById(`frame-card-${frameNum}`)?.classList.add("frame-card-active");
+    if (shouldRender) triggerLivePreview();
+};
+
+// =========================================================
+// 2. QR CONTENT TYPE SWITCHING & PAYLOAD BUILDER
 // =========================================================
 window.filterQrTypeButtons = function(queryText) {
     const q = (queryText || "").toLowerCase().trim();
     document.querySelectorAll("#qrTypeGrid .qr-tab").forEach(btn => {
-        const text = btn.innerText.toLowerCase();
-        if (!q || text.includes(q)) {
-            btn.classList.remove("hidden");
-        } else {
-            btn.classList.add("hidden");
-        }
+        const txt = btn.innerText.toLowerCase();
+        btn.classList.toggle("hidden", Boolean(q && !txt.includes(q)));
     });
 };
 
 window.setQRType = function(type) {
     currentQRType = type;
 
-    // Update Active Style on 2-Column Grid Buttons
     document.querySelectorAll("#qrTypeGrid .qr-tab").forEach(btn => {
         btn.classList.remove("type-btn-active", "border-2");
         btn.classList.add("border");
     });
-    const activeBtn = document.getElementById(`tab-${type}`);
-    if (activeBtn) {
-        activeBtn.classList.add("type-btn-active", "border-2");
-    }
+    document.getElementById(`tab-${type}`)?.classList.add("type-btn-active", "border-2");
 
-    // Hide all input forms first
     ["form-single", "form-upi", "form-vcard", "form-wifi", "form-social"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add("hidden");
+        document.getElementById(id)?.classList.add("hidden");
     });
 
     const singleLabel = document.getElementById("singleInputLabel");
@@ -81,17 +266,17 @@ window.setQRType = function(type) {
     const singleInput = document.getElementById("qrInput");
 
     if (type === "upi") {
-        document.getElementById("form-upi").classList.remove("hidden");
+        document.getElementById("form-upi")?.classList.remove("hidden");
     } else if (type === "vcard") {
-        document.getElementById("form-vcard").classList.remove("hidden");
+        document.getElementById("form-vcard")?.classList.remove("hidden");
     } else if (type === "wifi") {
-        document.getElementById("form-wifi").classList.remove("hidden");
+        document.getElementById("form-wifi")?.classList.remove("hidden");
     } else if (type === "social") {
-        document.getElementById("form-social").classList.remove("hidden");
+        document.getElementById("form-social")?.classList.remove("hidden");
     } else {
-        document.getElementById("form-single").classList.remove("hidden");
+        document.getElementById("form-single")?.classList.remove("hidden");
         if (type === "url") {
-            singleLabel.innerHTML = `URL <span class="text-red-500">*</span>`;
+            singleLabel.innerHTML = `Website URL <span class="text-red-500">*</span>`;
             singlePrefix.textContent = "https://";
             singlePrefix.classList.remove("hidden");
             singleInput.placeholder = "example.com";
@@ -106,9 +291,9 @@ window.setQRType = function(type) {
             singlePrefix.classList.remove("hidden");
             singleInput.placeholder = "+919876543210";
         } else if (type === "text") {
-            singleLabel.innerHTML = `Plain Text / Message <span class="text-red-500">*</span>`;
+            singleLabel.innerHTML = `Plain Text / Notice <span class="text-red-500">*</span>`;
             singlePrefix.classList.add("hidden");
-            singleInput.placeholder = "Enter any text, note, or serial code...";
+            singleInput.placeholder = "Type message or code (Tip: Use Dynamic mode for long text!)";
         }
     }
 
@@ -117,23 +302,18 @@ window.setQRType = function(type) {
 
 window.getCurrentQRType = () => currentQRType;
 
-// =========================================================
-// 2. FORMAT PAYLOAD & STRUCTURED DATA FOR ALL 8 QR TYPES
-// =========================================================
 window.getCurrentFormattedPayload = function() {
     if (currentQRType === "upi") {
         const upiId = (document.getElementById("customUpiId")?.value || "9661692365@ybl").trim();
         const name = (document.getElementById("customUpiName")?.value || "Merchant").trim();
         const amount = (document.getElementById("customUpiAmount")?.value || "").trim();
         let uri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&cu=INR`;
-        if (amount && Number(amount) > 0) {
-            uri += `&am=${Number(amount).toFixed(2)}`;
-        }
+        if (amount && Number(amount) > 0) uri += `&am=${Number(amount).toFixed(2)}`;
         return uri;
     }
 
     if (currentQRType === "vcard") {
-        const name = (document.getElementById("vcName")?.value || "Contact Name").trim();
+        const name = (document.getElementById("vcName")?.value || "Contact").trim();
         const phone = (document.getElementById("vcPhone")?.value || "").trim();
         const email = (document.getElementById("vcEmail")?.value || "").trim();
         const org = (document.getElementById("vcOrg")?.value || "").trim();
@@ -162,7 +342,7 @@ window.getCurrentFormattedPayload = function() {
 
     if (currentQRType === "social") {
         const hubData = {
-            t: (document.getElementById("socTitle")?.value || "Connect With Us").trim(),
+            t: (document.getElementById("socTitle")?.value || "My Social Hub").trim(),
             ig: (document.getElementById("socInsta")?.value || "").trim(),
             yt: (document.getElementById("socYt")?.value || "").trim(),
             wa: (document.getElementById("socWa")?.value || "").trim(),
@@ -174,28 +354,14 @@ window.getCurrentFormattedPayload = function() {
     }
 
     const raw = (document.getElementById("qrInput")?.value || "").trim();
+    if (currentQRType === "whatsapp") return `https://wa.me/${raw.replace(/\D/g, "") || "919876543210"}`;
+    if (currentQRType === "phone") return `tel:${raw.replace(/[^\d+]/g, "") || "+919876543210"}`;
+    if (currentQRType === "text") return raw || "SmartQR Text";
 
-    if (currentQRType === "whatsapp") {
-        const cleanNum = raw.replace(/\D/g, "") || "919876543210";
-        return `https://wa.me/${cleanNum}`;
-    }
-
-    if (currentQRType === "phone") {
-        const cleanTel = raw.replace(/[^\d+]/g, "") || "+919876543210";
-        return `tel:${cleanTel}`;
-    }
-
-    if (currentQRType === "text") {
-        return raw || "Sample QR Text";
-    }
-
-    // Default: Website URL
     if (!raw) return "https://example.com";
-    if (!/^https?:\/\//i.test(raw)) return `https://${raw}`;
-    return raw;
+    return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 };
 
-// Returns structured field values so Dynamic QR can store & re-edit them later
 window.getCurrentStructuredDetails = function() {
     return {
         upiId: document.getElementById("customUpiId")?.value.trim() || "",
@@ -220,99 +386,7 @@ window.getCurrentStructuredDetails = function() {
 };
 
 // =========================================================
-// 3. JOTFORM DESIGN TABS, 8 FRAMES & HEX COLOR SYNC
-// =========================================================
-window.switchDesignTab = function(tab) {
-    const styleBox = document.getElementById("designTabStyle");
-    const logoBox = document.getElementById("designTabLogo");
-    const styleBtn = document.getElementById("tabStyleBtn");
-    const logoBtn = document.getElementById("tabLogoBtn");
-
-    if (tab === "style") {
-        styleBox.classList.remove("hidden");
-        logoBox.classList.add("hidden");
-        styleBtn.className = "px-4 py-1.5 rounded-full text-xs font-extrabold bg-indigo-100 text-indigo-800 transition";
-        logoBtn.className = "px-4 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:bg-slate-100 transition";
-    } else {
-        logoBox.classList.remove("hidden");
-        styleBox.classList.add("hidden");
-        logoBtn.className = "px-4 py-1.5 rounded-full text-xs font-extrabold bg-indigo-100 text-indigo-800 transition";
-        styleBtn.className = "px-4 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:bg-slate-100 transition";
-    }
-};
-
-window.selectJotformFrame = function(frameNum) {
-    currentFrameId = frameNum;
-
-    // Highlight selected Frame Card (1 to 8)
-    document.querySelectorAll(".frame-card").forEach(card => {
-        card.classList.remove("frame-card-active");
-    });
-    const activeCard = document.getElementById(`frame-card-${frameNum}`);
-    if (activeCard) {
-        activeCard.classList.add("frame-card-active");
-    }
-
-    // Lock Frame Text & Text Color when Frame 1 (Plain QR) is selected, Unlock on 2..8
-    const frameTextInput = document.getElementById("frameTextInput");
-    const frameLockIcon = document.getElementById("frameTextLockIcon");
-    const textLockIcon = document.getElementById("textColorLockIcon");
-
-    if (frameNum === 1) {
-        frameTextInput.disabled = true;
-        frameTextInput.classList.add("bg-slate-100");
-        frameTextInput.classList.remove("bg-white");
-        if (frameLockIcon) frameLockIcon.classList.remove("hidden");
-        if (textLockIcon) textLockIcon.classList.remove("hidden");
-    } else {
-        frameTextInput.disabled = false;
-        frameTextInput.classList.remove("bg-slate-100");
-        frameTextInput.classList.add("bg-white");
-        if (frameLockIcon) frameLockIcon.classList.add("hidden");
-        if (textLockIcon) textLockIcon.classList.add("hidden");
-    }
-
-    triggerLivePreview();
-};
-
-window.setDotPattern = function(pattern) {
-    currentDotStyle = pattern;
-    const hiddenInput = document.getElementById("qrDotStyle");
-    if (hiddenInput) hiddenInput.value = pattern;
-
-    document.querySelectorAll(".dot-btn").forEach(btn => {
-        btn.className = "dot-btn py-2 rounded-xl border border-slate-200 text-slate-600";
-    });
-    const active = document.getElementById(`dot-${pattern}`);
-    if (active) {
-        active.className = "dot-btn py-2 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700";
-    }
-    triggerLivePreview();
-};
-
-// Synchronize Color Picker Inputs <-> Hex Text Inputs
-function bindHexAndColorPicker(hexInputId, colorPickerId) {
-    const hexEl = document.getElementById(hexInputId);
-    const pickerEl = document.getElementById(colorPickerId);
-    if (!hexEl || !pickerEl) return;
-
-    pickerEl.addEventListener("input", () => {
-        hexEl.value = pickerEl.value.toUpperCase();
-        triggerLivePreview();
-    });
-
-    hexEl.addEventListener("input", () => {
-        let val = hexEl.value.trim();
-        if (!val.startsWith("#")) val = "#" + val;
-        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-            pickerEl.value = val.toLowerCase();
-            triggerLivePreview();
-        }
-    });
-}
-
-// =========================================================
-// 4. AUTO 1:1 SQUARE LOGO UPLOAD PROCESSOR
+// 3. 1:1 PHOTO LOGO & QUICK EMOJI BADGE GENERATOR
 // =========================================================
 function setupLogoUploader() {
     const logoInput = document.getElementById("qrLogoInput");
@@ -332,42 +406,77 @@ function setupLogoUploader() {
                 sqCanvas.height = size;
                 const ctx = sqCanvas.getContext("2d");
 
-                // Rounded white pad behind logo
+                // Circular white badge with dashed accent ring (Like Screenshot 20)
                 ctx.fillStyle = "#ffffff";
                 ctx.beginPath();
-                ctx.roundRect(0, 0, size, size, 32);
+                ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Center 1:1 Square Crop
+                ctx.strokeStyle = document.getElementById("fgColor")?.value || "#10b981";
+                ctx.lineWidth = 6;
+                ctx.setLineDash([12, 8]);
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
                 const minSide = Math.min(img.width, img.height);
                 const sx = (img.width - minSide) / 2;
                 const sy = (img.height - minSide) / 2;
-                const pad = 14;
+                const pad = 20;
 
                 ctx.save();
                 ctx.beginPath();
-                ctx.roundRect(pad, pad, size - pad * 2, size - pad * 2, 22);
+                ctx.arc(size / 2, size / 2, size / 2 - pad, 0, Math.PI * 2);
                 ctx.clip();
                 ctx.drawImage(img, sx, sy, minSide, minSide, pad, pad, size - pad * 2, size - pad * 2);
                 ctx.restore();
 
                 uploadedLogoDataUrl = sqCanvas.toDataURL("image/png");
-
-                // Show thumbnail inside Logo tab
-                const thumb = document.getElementById("logoThumbPreview");
-                const wrap = document.getElementById("logoPreviewWrapper");
-                if (thumb && wrap) {
-                    thumb.src = uploadedLogoDataUrl;
-                    wrap.classList.remove("hidden");
-                    wrap.classList.add("flex");
-                }
-
+                showLogoThumb(uploadedLogoDataUrl);
                 triggerLivePreview();
             };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
+}
+
+window.setQuickEmojiLogo = function(emojiChar) {
+    const size = 200;
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = document.getElementById("fgColor")?.value || "#2563eb";
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    ctx.font = "bold 96px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#0f172a";
+    ctx.fillText(emojiChar, size / 2, size / 2 + 6);
+
+    uploadedLogoDataUrl = c.toDataURL("image/png");
+    showLogoThumb(uploadedLogoDataUrl);
+    triggerLivePreview();
+};
+
+function showLogoThumb(dataUrl) {
+    const thumb = document.getElementById("logoThumbPreview");
+    const wrap = document.getElementById("logoPreviewWrapper");
+    if (thumb && wrap) {
+        thumb.src = dataUrl;
+        wrap.classList.remove("hidden");
+        wrap.classList.add("flex");
+    }
 }
 
 window.clearQrLogo = function() {
@@ -384,18 +493,25 @@ window.clearQrLogo = function() {
 
 window.getCurrentQrCustomConfig = function() {
     return {
+        themeKey: currentThemeKey,
+        useGradient: document.getElementById("useGradientToggle")?.checked ?? true,
         frameId: currentFrameId,
         frameText: (document.getElementById("frameTextInput")?.value || "Scan Me").trim(),
-        textColor: document.getElementById("frameTextColor")?.value || "#000000",
-        fgColor: document.getElementById("fgColor")?.value || "#000000",
+        fontFamily: document.getElementById("qrFontFamily")?.value || "Inter",
+        textColor: document.getElementById("frameTextColor")?.value || "#0f172a",
+        fgColor: document.getElementById("fgColor")?.value || "#0f172a",
+        gradColor2: document.getElementById("gradColor2")?.value || "#2563eb",
+        eyeColor: document.getElementById("eyeColor")?.value || "#0f172a",
         bgColor: document.getElementById("bgColor")?.value || "#ffffff",
         dotStyle: currentDotStyle,
+        eyeOuter: currentEyeOuter,
+        eyeInner: currentEyeInner,
         logoDataUrl: uploadedLogoDataUrl || null
     };
 };
 
 // =========================================================
-// 5. MASTER 8-FRAME CANVAS COMPOSITOR (JOTFORM REPLICA)
+// 4. MASTER ARTISTIC & SCENIC CANVAS COMPOSITOR
 // =========================================================
 function drawCornerBrackets(ctx, x, y, w, h, armLen, color, lineWidth = 12) {
     ctx.strokeStyle = color;
@@ -403,70 +519,131 @@ function drawCornerBrackets(ctx, x, y, w, h, armLen, color, lineWidth = 12) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Top-Left Bracket
     ctx.beginPath();
-    ctx.moveTo(x, y + armLen);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x + armLen, y);
+    ctx.moveTo(x, y + armLen); ctx.lineTo(x, y); ctx.lineTo(x + armLen, y);
+    ctx.moveTo(x + w - armLen, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + armLen);
+    ctx.moveTo(x, y + h - armLen); ctx.lineTo(x, y + h); ctx.lineTo(x + armLen, y + h);
+    ctx.moveTo(x + w - armLen, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - armLen);
     ctx.stroke();
+}
 
-    // Top-Right Bracket
-    ctx.beginPath();
-    ctx.moveTo(x + w - armLen, y);
-    ctx.lineTo(x + w, y);
-    ctx.lineTo(x + w, y + armLen);
-    ctx.stroke();
+// Draws Scenic Sunset, Mountains & Pine Trees Poster Card (Like Screenshot 18)
+function drawScenicMountainBackdrop(ctx, w, h) {
+    // Sunset Sky Gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+    skyGrad.addColorStop(0, "#fecdd3");   // Soft Rose
+    skyGrad.addColorStop(0.45, "#fde68a"); // Warm Sunset Gold
+    skyGrad.addColorStop(1, "#99f6e4");   // Mint Horizon
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, w, h);
 
-    // Bottom-Left Bracket
+    // Glowing Sun Circle
+    ctx.fillStyle = "#fb7185";
     ctx.beginPath();
-    ctx.moveTo(x, y + h - armLen);
-    ctx.lineTo(x, y + h);
-    ctx.lineTo(x + armLen, y + h);
-    ctx.stroke();
+    ctx.arc(w / 2, 130, 65, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Bottom-Right Bracket
+    // Distant Mountains
+    ctx.fillStyle = "#0f766e";
     ctx.beginPath();
-    ctx.moveTo(x + w - armLen, y + h);
-    ctx.lineTo(x + w, y + h);
-    ctx.lineTo(x + w, y + h - armLen);
-    ctx.stroke();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, h - 180);
+    ctx.lineTo(180, h - 310);
+    ctx.lineTo(340, h - 200);
+    ctx.lineTo(500, h - 330);
+    ctx.lineTo(w, h - 190);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Foreground Mountains
+    ctx.fillStyle = "#115e59";
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(120, h - 220);
+    ctx.lineTo(290, h - 130);
+    ctx.lineTo(440, h - 240);
+    ctx.lineTo(w, h - 110);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Pine Tree Silhouettes at Bottom
+    const drawPine = (cx, baseY, treeH) => {
+        ctx.fillStyle = "#042f2e";
+        for (let layer = 0; layer < 3; layer++) {
+            const topY = baseY - treeH + layer * 18;
+            const bY = baseY - (2 - layer) * 18;
+            const halfW = 18 + layer * 10;
+            ctx.beginPath();
+            ctx.moveTo(cx, topY);
+            ctx.lineTo(cx - halfW, bY);
+            ctx.lineTo(cx + halfW, bY);
+            ctx.closePath();
+            ctx.fill();
+        }
+    };
+
+    [55, 110, 530, 585].forEach((xPos, idx) => {
+        drawPine(xPos, h - 15, 75 + (idx % 2) * 20);
+    });
 }
 
 window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
     const cfg = customCfg || window.getCurrentQrCustomConfig();
     const frameId = Number(cfg.frameId || 1);
     const frameText = cfg.frameText || "Scan Me";
-    const fgColor = cfg.fgColor || "#000000";
+    const fontFamily = cfg.fontFamily || "Inter";
+    const fgColor = cfg.fgColor || "#0f172a";
+    const gradColor2 = cfg.gradColor2 || "#2563eb";
+    const eyeColor = cfg.eyeColor || fgColor;
     const bgColor = cfg.bgColor || "#ffffff";
-    const textColor = cfg.textColor || "#000000";
+    const textColor = cfg.textColor || "#0f172a";
     const dotStyle = cfg.dotStyle || "square";
+    const eyeOuter = cfg.eyeOuter || "extra-rounded";
+    const eyeInner = cfg.eyeInner || "dot";
+    const useGradient = cfg.useGradient ?? true;
     const logo = cfg.logoDataUrl || null;
 
     const finalCanvas = document.getElementById("finalQrCanvas");
     if (!finalCanvas) return;
     const ctx = finalCanvas.getContext("2d");
 
-    // Update QRCodeStyling instance
+    // Configure Dots Options (Solid or Rich Gradient)
+    const dotsConfig = useGradient
+        ? {
+            type: dotStyle,
+            gradient: {
+                type: "linear",
+                rotation: Math.PI / 4,
+                colorStops: [
+                    { offset: 0, color: fgColor },
+                    { offset: 1, color: gradColor2 }
+                ]
+            }
+        }
+        : {
+            color: fgColor,
+            type: dotStyle
+        };
+
     qrStyler.update({
         data: payloadData || "https://example.com",
         image: logo || "",
         qrOptions: {
             errorCorrectionLevel: logo ? "H" : "M"
         },
-        dotsOptions: {
-            color: fgColor,
-            type: dotStyle
-        },
+        dotsOptions: dotsConfig,
         backgroundOptions: {
-            color: bgColor
+            color: frameId === 8 ? "#ffffff" : bgColor
         },
         cornersSquareOptions: {
-            color: fgColor,
-            type: dotStyle === "dots" ? "dot" : (dotStyle === "rounded" ? "extra-rounded" : "square")
+            color: eyeColor,
+            type: eyeOuter
         },
         cornersDotOptions: {
-            color: fgColor,
-            type: dotStyle === "dots" ? "dot" : "square"
+            color: gradColor2 || eyeColor,
+            type: eyeInner
         }
     });
 
@@ -478,10 +655,37 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
         await new Promise((resolve) => {
             qrImg.onload = () => {
                 const qrSize = 500;
+                const fontStr = fontFamily === "Pacifico"
+                    ? `42px 'Pacifico', cursive`
+                    : `800 42px '${fontFamily}', sans-serif`;
 
-                // Determine Canvas Size Based on Selected Frame (1 to 8)
-                if (frameId === 1) {
-                    // Frame 1: Plain QR
+                if (frameId === 8) {
+                    // Frame 8: Scenic Mountain Art Poster Card (Screenshot 18 Style)
+                    finalCanvas.width = 640;
+                    finalCanvas.height = 760;
+                    drawScenicMountainBackdrop(ctx, 640, 760);
+
+                    // Crisp White Rounded Card for Fast QR Scanning
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+                    ctx.beginPath();
+                    ctx.roundRect(70, 75, 500, 500, 32);
+                    ctx.fill();
+
+                    ctx.drawImage(qrImg, 85, 90, 470, 470);
+
+                    // Frosted Bottom Text Pill
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+                    ctx.beginPath();
+                    ctx.roundRect(120, 610, 400, 86, 43);
+                    ctx.fill();
+
+                    ctx.font = fontStr;
+                    ctx.fillStyle = textColor;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(frameText, 320, 654);
+                } 
+                else if (frameId === 1) {
                     finalCanvas.width = 600;
                     finalCanvas.height = 600;
                     ctx.fillStyle = bgColor;
@@ -489,21 +693,28 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
                     ctx.drawImage(qrImg, 50, 50, qrSize, qrSize);
                 } 
                 else if (frameId === 2) {
-                    // Frame 2: QR + Plain "Scan Me" Below
-                    finalCanvas.width = 600;
-                    finalCanvas.height = 690;
+                    // Frame 2: Dashed/Clean Bottom Banner (Like Screenshot 20)
+                    finalCanvas.width = 620;
+                    finalCanvas.height = 720;
                     ctx.fillStyle = bgColor;
-                    ctx.fillRect(0, 0, 600, 690);
-                    ctx.drawImage(qrImg, 50, 40, qrSize, qrSize);
+                    ctx.fillRect(0, 0, 620, 720);
+                    ctx.drawImage(qrImg, 60, 40, qrSize, qrSize);
 
-                    ctx.font = "800 44px Inter, sans-serif";
+                    ctx.strokeStyle = gradColor2 || fgColor;
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([10, 8]);
+                    ctx.beginPath();
+                    ctx.roundRect(75, 575, 470, 92, 22);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.font = fontStr;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
-                    ctx.fillText(frameText, 300, 610);
+                    ctx.fillText(frameText, 310, 622);
                 } 
                 else if (frameId === 3) {
-                    // Frame 3: Full Box Border Around Both QR & Text Inside
                     finalCanvas.width = 640;
                     finalCanvas.height = 730;
                     ctx.fillStyle = bgColor;
@@ -512,19 +723,17 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
                     ctx.strokeStyle = fgColor;
                     ctx.lineWidth = 12;
                     ctx.beginPath();
-                    ctx.roundRect(35, 35, 570, 660, 28);
+                    ctx.roundRect(35, 35, 570, 660, 32);
                     ctx.stroke();
 
                     ctx.drawImage(qrImg, 70, 55, qrSize, qrSize);
-
-                    ctx.font = "800 44px Inter, sans-serif";
+                    ctx.font = fontStr;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(frameText, 320, 625);
                 } 
                 else if (frameId === 4) {
-                    // Frame 4: 4 Corner Brackets Around Both QR & Text Inside
                     finalCanvas.width = 640;
                     finalCanvas.height = 730;
                     ctx.fillStyle = bgColor;
@@ -533,73 +742,63 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
                     drawCornerBrackets(ctx, 35, 35, 570, 660, 85, fgColor, 12);
                     ctx.drawImage(qrImg, 70, 55, qrSize, qrSize);
 
-                    ctx.font = "800 44px Inter, sans-serif";
+                    ctx.font = fontStr;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(frameText, 320, 625);
                 } 
                 else if (frameId === 5) {
-                    // Frame 5: Connected Box Border + Solid Filled Bottom Banner
                     finalCanvas.width = 640;
                     finalCanvas.height = 740;
                     ctx.fillStyle = bgColor;
                     ctx.fillRect(0, 0, 640, 740);
 
-                    // Outer Box
                     ctx.strokeStyle = fgColor;
                     ctx.lineWidth = 12;
                     ctx.beginPath();
                     ctx.roundRect(35, 35, 570, 670, 28);
                     ctx.stroke();
 
-                    // Solid Bottom Banner
                     ctx.fillStyle = fgColor;
                     ctx.beginPath();
                     ctx.roundRect(35, 585, 570, 120, [0, 0, 24, 24]);
                     ctx.fill();
 
                     ctx.drawImage(qrImg, 70, 55, qrSize, qrSize);
-
-                    // Auto-contrast text inside solid ribbon if user left both black
-                    const bannerTextColor = (textColor.toLowerCase() === fgColor.toLowerCase()) ? "#ffffff" : textColor;
-                    ctx.font = "800 44px Inter, sans-serif";
-                    ctx.fillStyle = bannerTextColor;
+                    ctx.font = fontStr;
+                    ctx.fillStyle = "#ffffff";
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(frameText, 320, 647);
                 } 
                 else if (frameId === 6) {
-                    // Frame 6: Box Border Around QR + Separate Floating Pill Banner Below
                     finalCanvas.width = 640;
                     finalCanvas.height = 760;
                     ctx.fillStyle = bgColor;
                     ctx.fillRect(0, 0, 640, 760);
 
-                    // Box Around QR Only
                     ctx.strokeStyle = fgColor;
-                    ctx.lineWidth = 12;
+                    ctx.lineWidth = 10;
                     ctx.beginPath();
-                    ctx.roundRect(45, 35, 550, 550, 28);
+                    ctx.roundRect(45, 35, 550, 550, 32);
                     ctx.stroke();
 
                     ctx.drawImage(qrImg, 70, 60, qrSize, qrSize);
 
-                    // Floating Pill Below
                     ctx.fillStyle = fgColor;
                     ctx.beginPath();
-                    ctx.roundRect(85, 615, 470, 100, 24);
+                    ctx.roundRect(85, 615, 470, 100, 50);
                     ctx.fill();
 
-                    const pillTextColor = (textColor.toLowerCase() === fgColor.toLowerCase()) ? "#ffffff" : textColor;
-                    ctx.font = "800 42px Inter, sans-serif";
-                    ctx.fillStyle = pillTextColor;
+                    ctx.font = fontStr;
+                    ctx.fillStyle = "#ffffff";
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(frameText, 320, 666);
                 } 
-                else if (frameId === 7) {
-                    // Frame 7: Box Border Around QR Only + Plain Text Outside Below
+                else {
+                    // Frame 7: Box Border + Outside Text
                     finalCanvas.width = 640;
                     finalCanvas.height = 740;
                     ctx.fillStyle = bgColor;
@@ -612,24 +811,7 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
                     ctx.stroke();
 
                     ctx.drawImage(qrImg, 70, 60, qrSize, qrSize);
-
-                    ctx.font = "800 44px Inter, sans-serif";
-                    ctx.fillStyle = textColor;
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(frameText, 320, 660);
-                } 
-                else if (frameId === 8) {
-                    // Frame 8: 4 Corner Brackets Around QR Only + Plain Text Outside Below
-                    finalCanvas.width = 640;
-                    finalCanvas.height = 740;
-                    ctx.fillStyle = bgColor;
-                    ctx.fillRect(0, 0, 640, 740);
-
-                    drawCornerBrackets(ctx, 45, 35, 550, 550, 85, fgColor, 12);
-                    ctx.drawImage(qrImg, 70, 60, qrSize, qrSize);
-
-                    ctx.font = "800 44px Inter, sans-serif";
+                    ctx.font = fontStr;
                     ctx.fillStyle = textColor;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
@@ -642,20 +824,114 @@ window.renderCustomQrToCanvas = async function(payloadData, customCfg = null) {
             qrImg.src = imgUrl;
         });
     } catch (err) {
-        console.error("Frame Compositor Error:", err);
+        console.error("Artistic QR Render Error:", err);
     }
 };
 
-function triggerLivePreview() {
+window.triggerLivePreview = function() {
     clearTimeout(renderTimer);
     renderTimer = setTimeout(() => {
         const payload = window.getCurrentFormattedPayload();
         window.renderCustomQrToCanvas(payload);
-    }, 100);
-}
+    }, 90);
+};
 
 // =========================================================
-// 6. COPY LINK, RESET STUDIO & DOWNLOAD HANDLERS
+// 5. STYLED BULK QR GENERATOR (WITH STRICT TRIAL LIMIT)
+// =========================================================
+window.generateBulkQrZip = async function() {
+    const rawText = document.getElementById("bulkTextInput")?.value.trim() || "";
+    const selectedTheme = document.getElementById("bulkThemeSelect")?.value || "current";
+    const statusEl = document.getElementById("bulkStatusText");
+    const btn = document.getElementById("generateBulkZipBtn");
+
+    if (!rawText) {
+        alert("Kripya CSV file upload karein ya box me links paste karein!");
+        return;
+    }
+
+    // Check Free Trial Quota Before Generating Bulk ZIP
+    const isPro = window.isUserProPlan ? window.isUserProPlan() : false;
+    let lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    if (!isPro) {
+        if (window.checkAndConsumeTrialQuota && !window.checkAndConsumeTrialQuota("bulkRun")) {
+            return; // Redirected to #pricing
+        }
+        if (lines.length > 5) {
+            alert("⚠️ Free Trial Limit: Free trial me ek baar me maximum 5 Bulk QR codes generate hote hain. 500+ Bulk QRs ke liye ₹499.00 Pro Plan upgrade karein! Abhi pehle 5 QRs generate kiye ja rahe hain.");
+            lines = lines.slice(0, 5);
+        }
+    } else {
+        lines = lines.slice(0, 500);
+    }
+
+    btn.disabled = true;
+    statusEl.classList.remove("hidden");
+    const zip = new JSZip();
+
+    // Determine Theme Config for Bulk QRs
+    const themeObj = (selectedTheme !== "current" && ARTISTIC_THEMES[selectedTheme])
+        ? ARTISTIC_THEMES[selectedTheme]
+        : {
+            color1: document.getElementById("fgColor")?.value || "#0f172a",
+            color2: document.getElementById("gradColor2")?.value || "#2563eb",
+            eyeColor: document.getElementById("eyeColor")?.value || "#0f172a",
+            bgColor: document.getElementById("bgColor")?.value || "#ffffff",
+            dotStyle: currentDotStyle,
+            eyeOuter: currentEyeOuter,
+            eyeInner: currentEyeInner
+        };
+
+    try {
+        for (let i = 0; i < lines.length; i++) {
+            const item = lines[i].split(",")[0].trim();
+            statusEl.textContent = `⏳ Designing Styled QR ${i + 1} of ${lines.length}...`;
+
+            const tempStyler = new QRCodeStyling({
+                width: 520,
+                height: 520,
+                data: item,
+                margin: 18,
+                qrOptions: { errorCorrectionLevel: "M" },
+                dotsOptions: {
+                    type: themeObj.dotStyle,
+                    gradient: {
+                        type: "linear",
+                        rotation: Math.PI / 4,
+                        colorStops: [
+                            { offset: 0, color: themeObj.color1 },
+                            { offset: 1, color: themeObj.color2 }
+                        ]
+                    }
+                },
+                backgroundOptions: { color: themeObj.bgColor },
+                cornersSquareOptions: { color: themeObj.eyeColor, type: themeObj.eyeOuter },
+                cornersDotOptions: { color: themeObj.color2, type: themeObj.eyeInner }
+            });
+
+            const blob = await tempStyler.getRawData("png");
+            const safeName = item.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 28);
+            zip.file(`Styled_QR_${i + 1}_${safeName}.png`, blob);
+        }
+
+        statusEl.textContent = "📦 Packing Styled ZIP archive...";
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `SmartQR_Bulk_${lines.length}_Codes.zip`;
+        link.click();
+
+        statusEl.textContent = `✅ Downloaded ${lines.length} Styled QR Codes in ZIP!`;
+    } catch (err) {
+        alert("Bulk QR Error: " + err.message);
+    } finally {
+        btn.disabled = false;
+    }
+};
+
+// =========================================================
+// 6. DOWNLOAD, COPY, RESET & INITIALIZATION
 // =========================================================
 window.copyCurrentQrLink = function() {
     const shortLinkEl = document.getElementById("shortLinkDisplay");
@@ -668,27 +944,25 @@ window.copyCurrentQrLink = function() {
 };
 
 window.resetQrStudio = function() {
-    document.getElementById("frameTextInput").value = "Scan Me";
-    document.getElementById("frameTextColor").value = "#000000";
-    document.getElementById("textColorHex").value = "#000000";
-    document.getElementById("fgColor").value = "#000000";
-    document.getElementById("fgColorHex").value = "#000000";
-    document.getElementById("bgColor").value = "#ffffff";
-    document.getElementById("bgColorHex").value = "#FFFFFF";
     window.clearQrLogo();
-    window.setDotPattern("square");
-    window.selectJotformFrame(1);
+    document.getElementById("frameTextInput").value = "Scan Me";
+    window.applyArtisticTheme("elegant");
 };
 
-// Download Existing Saved Dynamic QR from User Dashboard with its saved Frame
-window.downloadSavedCustomQR = async function(url, fgColor, bgColor, dotStyle, frameText, shortId, frameId = 1, textColor = "#000000") {
+window.downloadSavedCustomQR = async function(url, fgColor, bgColor, dotStyle, frameText, shortId, frameId = 1, textColor = "#0f172a", gradColor2 = "#2563eb") {
     await window.renderCustomQrToCanvas(url, {
+        useGradient: true,
         frameId: frameId || 1,
         frameText: frameText || "Scan Me",
-        textColor: textColor || "#000000",
-        fgColor: fgColor || "#000000",
+        fontFamily: "Inter",
+        textColor: textColor || "#0f172a",
+        fgColor: fgColor || "#0f172a",
+        gradColor2: gradColor2 || fgColor || "#2563eb",
+        eyeColor: fgColor || "#0f172a",
         bgColor: bgColor || "#ffffff",
-        dotStyle: dotStyle || "square",
+        dotStyle: dotStyle || "classy-rounded",
+        eyeOuter: "extra-rounded",
+        eyeInner: "dot",
         logoDataUrl: null
     });
     const canvas = document.getElementById("finalQrCanvas");
@@ -698,93 +972,58 @@ window.downloadSavedCustomQR = async function(url, fgColor, bgColor, dotStyle, f
     link.click();
 };
 
-// =========================================================
-// 7. BULK QR CODE GENERATOR (CSV / MULTI-LINE TO ZIP)
-// =========================================================
-window.generateBulkQrZip = async function() {
-    const rawText = document.getElementById("bulkTextInput")?.value.trim() || "";
-    const statusEl = document.getElementById("bulkStatusText");
-    const btn = document.getElementById("generateBulkZipBtn");
+function bindHexColorSync(hexId, pickerId) {
+    const hexEl = document.getElementById(hexId);
+    const pickEl = document.getElementById(pickerId);
+    if (!hexEl || !pickEl) return;
 
-    if (!rawText) {
-        alert("Kripya CSV file upload karein ya box me links paste karein!");
-        return;
-    }
-
-    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 100);
-    if (!lines.length) return;
-
-    btn.disabled = true;
-    statusEl.classList.remove("hidden");
-    const zip = new JSZip();
-    const cfg = window.getCurrentQrCustomConfig();
-
-    try {
-        for (let i = 0; i < lines.length; i++) {
-            const item = lines[i].split(",")[0].trim();
-            statusEl.textContent = `⏳ Generating QR ${i + 1} of ${lines.length}...`;
-
-            const tempStyler = new QRCodeStyling({
-                width: 500,
-                height: 500,
-                data: item,
-                margin: 18,
-                qrOptions: { errorCorrectionLevel: "M" },
-                dotsOptions: { color: cfg.fgColor, type: cfg.dotStyle },
-                backgroundOptions: { color: cfg.bgColor }
-            });
-
-            const blob = await tempStyler.getRawData("png");
-            const safeName = item.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 25);
-            zip.file(`QR_${i + 1}_${safeName}.png`, blob);
+    pickEl.addEventListener("input", () => {
+        hexEl.value = pickEl.value.toUpperCase();
+        window.triggerLivePreview();
+    });
+    hexEl.addEventListener("input", () => {
+        let v = hexEl.value.trim();
+        if (!v.startsWith("#")) v = "#" + v;
+        if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+            pickEl.value = v.toLowerCase();
+            window.triggerLivePreview();
         }
+    });
+}
 
-        statusEl.textContent = "📦 Packing ZIP archive...";
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = `Bulk_QRs_${lines.length}_Codes.zip`;
-        link.click();
-
-        statusEl.textContent = `✅ Successfully downloaded ${lines.length} QR Codes in ZIP!`;
-    } catch (err) {
-        alert("Bulk QR Error: " + err.message);
-    } finally {
-        btn.disabled = false;
-    }
-};
-
-// =========================================================
-// 8. INITIALIZE LISTENERS ON DOM LOAD
-// =========================================================
 window.addEventListener("DOMContentLoaded", () => {
-    bindHexAndColorPicker("textColorHex", "frameTextColor");
-    bindHexAndColorPicker("fgColorHex", "fgColor");
-    bindHexAndColorPicker("bgColorHex", "bgColor");
+    bindHexColorSync("fgColorHex", "fgColor");
+    bindHexColorSync("gradColor2Hex", "gradColor2");
+    bindHexColorSync("eyeColorHex", "eyeColor");
+    bindHexColorSync("bgColorHex", "bgColor");
+    bindHexColorSync("textColorHex", "frameTextColor");
     setupLogoUploader();
 
-    const watchedInputs = [
+    const watched = [
         "qrInput", "customUpiId", "customUpiName", "customUpiAmount",
         "vcName", "vcPhone", "vcEmail", "vcOrg", "vcWeb", "vcAddress",
         "wifiSsid", "wifiPass", "wifiEnc",
         "socTitle", "socInsta", "socYt", "socWa", "socWeb",
         "frameTextInput"
     ];
-
-    watchedInputs.forEach(id => {
+    watched.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener("input", triggerLivePreview);
-            el.addEventListener("change", triggerLivePreview);
+            el.addEventListener("input", window.triggerLivePreview);
+            el.addEventListener("change", window.triggerLivePreview);
         }
     });
 
+    // Download Button with Strict Free Trial Quota Check
     const dlBtn = document.getElementById("downloadBtn");
     if (dlBtn) {
         dlBtn.addEventListener("click", () => {
+            if (window.checkAndConsumeTrialQuota && !window.checkAndConsumeTrialQuota("customDownload")) {
+                return; // Quota exhausted -> redirected to #pricing
+            }
             const canvas = document.getElementById("finalQrCanvas");
             const link = document.createElement("a");
-            link.download = `SmartQR-HD-${Date.now()}.png`;
+            link.download = `SmartQR-${currentThemeKey}-${Date.now()}.png`;
             link.href = canvas.toDataURL("image/png");
             link.click();
         });
@@ -803,5 +1042,5 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    triggerLivePreview();
+    window.applyArtisticTheme("elegant");
 });
