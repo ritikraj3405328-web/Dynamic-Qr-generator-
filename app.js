@@ -1,5 +1,5 @@
 // app.js
-// Complete Controller: Multi-Type Dynamic QR Editor, Jotform Studio Saver, User Dashboard, Analytics, ₹499 UPI & Master Admin
+// Complete Controller: Live 14-Day Countdown Timer, Strict Free Trial Quota, Multi-Type Dynamic Editor, ₹499 UPI & Admin Panel
 
 import { 
     auth, provider, db, 
@@ -8,16 +8,182 @@ import {
     collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp 
 } from "./firebase-config.js";
 
-// Global State
+// Global App State
 let currentUser = null;
-let currentUserData = null; // { plan, trialStartMs, daysLeft, isPro, isExpired }
+let currentUserData = null; // { plan, trialStartMs, isPro, isExpired }
 let isDynamicMode = false;
 let authMode = "login";
 let cachedUserQRs = [];
-let cachedUserQRsMap = {}; // Stores QR objects by shortId for instant Multi-Type Editing
+let cachedUserQRsMap = {};
+let countdownInterval = null;
 
 // =========================================================
-// 1. MOBILE BACK-BUTTON ROUTER & MODAL CONTROLLER
+// 1. STRICT FREE TRIAL QUOTA & LIVE 14-DAY COUNTDOWN ENGINE
+// =========================================================
+const TRIAL_LIMITS = {
+    dynamicQr: 3,       // Max 3 Dynamic QRs in Free Trial
+    customDownload: 5,  // Max 5 Artistic/Custom QR Downloads
+    bulkRun: 2,         // Max 2 Bulk ZIP runs (5 rows max)
+    bizTools: 3,        // Max 3 Visiting Cards / Barcodes
+    cyberTools: 3       // Max 3 Cyber Cafe Tool Downloads
+};
+
+function getLocalTrialStartMs() {
+    let ms = localStorage.getItem("smartqr_trial_start_ms");
+    if (!ms) {
+        ms = String(Date.now());
+        localStorage.setItem("smartqr_trial_start_ms", ms);
+    }
+    return parseInt(ms, 10);
+}
+
+function getLocalQuotaUsage() {
+    try {
+        const raw = localStorage.getItem("smartqr_trial_usage");
+        if (raw) return JSON.parse(raw);
+    } catch (e) {
+        console.warn(e);
+    }
+    return { dynamicQr: 0, customDownload: 0, bulkRun: 0, bizTools: 0, cyberTools: 0 };
+}
+
+function saveLocalQuotaUsage(usageObj) {
+    localStorage.setItem("smartqr_trial_usage", JSON.stringify(usageObj));
+    updateQuotaBadgesUI();
+}
+
+window.isUserProPlan = function() {
+    if (currentUser && currentUser.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) return true;
+    return Boolean(currentUserData && currentUserData.isPro);
+};
+
+window.isUserTrialExpired = function() {
+    if (window.isUserProPlan()) return false;
+    const startMs = (currentUserData && currentUserData.trialStartMs) ? currentUserData.trialStartMs : getLocalTrialStartMs();
+    const expiryMs = startMs + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+    return Date.now() >= expiryMs;
+};
+
+// Enforces Strict Free Trial Limits Across All Features
+window.checkAndConsumeTrialQuota = function(featureKey) {
+    if (window.isUserProPlan()) return true;
+
+    if (window.isUserTrialExpired()) {
+        alert("⏰ Aapka 14-Day Free Trial samapt ho chuka hai! Sabhi features unlimited use karne ke liye ₹499.00 Pro Plan activate karein.");
+        window.location.hash = "#pricing";
+        return false;
+    }
+
+    const usage = getLocalQuotaUsage();
+    const maxAllowed = TRIAL_LIMITS[featureKey] || 3;
+    const currentUsed = usage[featureKey] || 0;
+
+    if (currentUsed >= maxAllowed) {
+        const labels = {
+            dynamicQr: "3 Dynamic QR Codes",
+            customDownload: "5 Custom QR Downloads",
+            bulkRun: "2 Free Bulk QR Runs",
+            bizTools: "3 Free Business Tool Uses (Visiting Card / Barcode)",
+            cyberTools: "3 Free Cyber Cafe Tool Downloads"
+        };
+        alert(`⚠️ Free Trial Quota Reached!\n\nAapne apne Free Trial ki limit (${labels[featureKey] || maxAllowed}) poori kar li hai.\n\nUnlimited access ke liye abhi ₹499.00 Pro Plan me upgrade karein!`);
+        window.location.hash = "#pricing";
+        return false;
+    }
+
+    usage[featureKey] = currentUsed + 1;
+    saveLocalQuotaUsage(usage);
+    return true;
+};
+
+function updateQuotaBadgesUI() {
+    const quotaEl = document.getElementById("trialQuotaSummary");
+    const sideQuotaEl = document.getElementById("sidebarQuotaText");
+    if (!quotaEl) return;
+
+    if (window.isUserProPlan()) {
+        quotaEl.textContent = "👑 PRO UNLIMITED ACTIVE";
+        quotaEl.className = "text-[10px] bg-emerald-600 text-white px-2.5 py-0.5 rounded-full font-extrabold";
+        if (sideQuotaEl) sideQuotaEl.textContent = "Unlimited Pro Plan Active";
+        return;
+    }
+
+    const u = getLocalQuotaUsage();
+    const dynLeft = Math.max(0, TRIAL_LIMITS.dynamicQr - (u.dynamicQr || 0));
+    const dlLeft = Math.max(0, TRIAL_LIMITS.customDownload - (u.customDownload || 0));
+    quotaEl.textContent = `Free Credits Left: ${dynLeft}/${TRIAL_LIMITS.dynamicQr} Dynamic | ${dlLeft}/${TRIAL_LIMITS.customDownload} Downloads`;
+    if (sideQuotaEl) {
+        sideQuotaEl.textContent = `Left: ${dynLeft} Dynamic QRs, ${dlLeft} Custom Downloads`;
+    }
+}
+
+// Starts Real-Time Second-by-Second Ticking Countdown
+function startLiveTrialCountdown() {
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    const tick = () => {
+        const topTimerEl = document.getElementById("liveTrialTimerText");
+        const expDateEl = document.getElementById("trialExpiryDateBadge");
+        const sideTimerEl = document.getElementById("trialDaysText");
+        const planBadge = document.getElementById("planBadge");
+        const trialBox = document.getElementById("trialCountdownBox");
+
+        const isAdmin = currentUser && currentUser.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+        const isPro = window.isUserProPlan();
+
+        if (isAdmin || isPro) {
+            if (topTimerEl) topTimerEl.textContent = isAdmin ? "👑 Master Admin Mode" : "✨ Flex Pro Plan (Unlimited)";
+            if (expDateEl) expDateEl.textContent = "No Expiry";
+            if (planBadge) {
+                planBadge.textContent = isAdmin ? "👑 ADMIN" : "✨ PRO PLAN";
+                planBadge.className = "text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full";
+            }
+            if (trialBox) trialBox.classList.add("hidden");
+            return;
+        }
+
+        const startMs = (currentUserData && currentUserData.trialStartMs) ? currentUserData.trialStartMs : getLocalTrialStartMs();
+        const expiryMs = startMs + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+        const diffMs = expiryMs - Date.now();
+
+        const expDateStr = new Date(expiryMs).toLocaleDateString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric"
+        });
+        if (expDateEl) expDateEl.textContent = `(Expires on: ${expDateStr})`;
+
+        if (diffMs <= 0) {
+            if (currentUserData) currentUserData.isExpired = true;
+            if (topTimerEl) topTimerEl.textContent = "❌ 14-Day Trial Expired!";
+            if (sideTimerEl) sideTimerEl.textContent = `Trial Expired on ${expDateStr}`;
+            if (planBadge) {
+                planBadge.textContent = "⚠️ Expired";
+                planBadge.className = "text-[11px] font-extrabold bg-red-100 text-red-700 px-2.5 py-1 rounded-full";
+            }
+            return;
+        }
+
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+        const mins = Math.floor((diffMs / (1000 * 60)) % 60);
+        const secs = Math.floor((diffMs / 1000) % 60);
+
+        const pad = (n) => String(n).padStart(2, "0");
+        const formattedCountdown = `${days}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+
+        if (topTimerEl) topTimerEl.textContent = `⏳ ${formattedCountdown} left`;
+        if (sideTimerEl) sideTimerEl.textContent = `Ends in: ${formattedCountdown} (${expDateStr})`;
+        if (planBadge) {
+            planBadge.textContent = `⏳ ${days}d ${pad(hours)}h left`;
+            planBadge.className = "text-[11px] font-extrabold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-mono";
+        }
+    };
+
+    tick();
+    countdownInterval = setInterval(tick, 1000);
+}
+
+// =========================================================
+// 2. MOBILE BACK-BUTTON ROUTER & MODAL CONTROLLER
 // =========================================================
 window.toggleSidebar = function(forceClose = false) {
     const drawer = document.getElementById("sidebarDrawer");
@@ -36,8 +202,7 @@ window.toggleSidebar = function(forceClose = false) {
 
 function hideAllModals() {
     ["trialPromoModal", "authModal", "upiModal", "editModal"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add("hidden");
+        document.getElementById(id)?.classList.add("hidden");
     });
     window.toggleSidebar(true);
 }
@@ -60,7 +225,6 @@ function handleRoute() {
     const hash = window.location.hash || "#home";
     hideAllModals();
 
-    // Popup Modal Hashes (Mobile Back button closes modal and returns to previous screen)
     if (hash === "#trial") {
         document.getElementById("trialPromoModal")?.classList.remove("hidden");
         return;
@@ -85,7 +249,6 @@ function handleRoute() {
         return;
     }
 
-    // Hide all page views
     const views = [
         "view-home", "view-bulk-qr", "view-dashboard", 
         "view-analytics", "view-cyber-tools", "view-biz-tools", 
@@ -93,7 +256,6 @@ function handleRoute() {
     ];
     views.forEach(id => document.getElementById(id)?.classList.add("hidden"));
 
-    // Show active view
     if (hash === "#bulk-qr") {
         document.getElementById("view-bulk-qr")?.classList.remove("hidden");
     } 
@@ -102,7 +264,8 @@ function handleRoute() {
     } 
     else if (hash === "#biz-tools") {
         document.getElementById("view-biz-tools")?.classList.remove("hidden");
-        if (window.generateProductBarcode) window.generateProductBarcode();
+        if (window.renderSavedVisitingCards) window.renderSavedVisitingCards();
+        if (window.renderSavedBarcodes) window.renderSavedBarcodes();
     } 
     else if (hash === "#pricing") {
         document.getElementById("view-pricing")?.classList.remove("hidden");
@@ -120,8 +283,8 @@ function handleRoute() {
             window.goDirectAuth("login");
             return;
         }
-        if (currentUserData && currentUserData.isExpired) {
-            alert("⚠️ Aapka 14-Day Free Trial samapt ho chuka hai! Analytics dekhne ke liye ₹499.00 Pro Plan upgrade karein.");
+        if (window.isUserTrialExpired()) {
+            alert("⚠️ Aapka 14-Day Free Trial samapt ho chuka hai! Live Analytics dekhne ke liye ₹499.00 Pro Plan upgrade karein.");
             window.location.hash = "#pricing";
             return;
         }
@@ -148,10 +311,14 @@ if (!window.location.hash) {
     window.history.replaceState(null, "", "#home");
 }
 window.addEventListener("hashchange", handleRoute);
-window.addEventListener("DOMContentLoaded", handleRoute);
+window.addEventListener("DOMContentLoaded", () => {
+    startLiveTrialCountdown();
+    updateQuotaBadgesUI();
+    handleRoute();
+});
 
 // =========================================================
-// 2. AUTHENTICATION & PASSWORD SHOW/HIDE (👁️)
+// 3. AUTHENTICATION & USER PROFILE SYNC
 // =========================================================
 window.togglePasswordVisibility = function() {
     const passInput = document.getElementById("authPassword");
@@ -191,14 +358,8 @@ document.getElementById("emailAuthSubmitBtn")?.addEventListener("click", async (
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value.trim();
 
-    if (!email || !pass) {
-        alert("Kripya Email aur Password dono dalein!");
-        return;
-    }
-    if (pass.length < 6) {
-        alert("Password kam se kam 6 characters ka hona chahiye!");
-        return;
-    }
+    if (!email || !pass) return alert("Kripya Email aur Password dono dalein!");
+    if (pass.length < 6) return alert("Password kam se kam 6 characters ka hona chahiye!");
 
     const btn = document.getElementById("emailAuthSubmitBtn");
     btn.disabled = true;
@@ -213,10 +374,10 @@ document.getElementById("emailAuthSubmitBtn")?.addEventListener("click", async (
         window.location.hash = "#dashboard";
     } catch (err) {
         if (authMode === "signup" && err.code === "auth/email-already-in-use") {
-            alert("Yeh Email pehle se registered hai! Kripya Sign In tab par click karke login karein.");
+            alert("Yeh Email pehle se registered hai! Sign In tab par click karke login karein.");
             window.goDirectAuth("login");
         } else if (authMode === "login" && err.code === "auth/invalid-credential") {
-            alert("Galat Email ya Password! Agar aap naye user hain toh 'Sign Up Free' par click karein.");
+            alert("Galat Email ya Password! Naya account banane ke liye 'Sign Up Free' chunein.");
         } else {
             alert("Auth Error: " + err.message);
         }
@@ -246,50 +407,32 @@ async function syncUserProfileAndTrial(user) {
     const snap = await getDoc(userRef);
 
     let data;
+    const localStart = getLocalTrialStartMs();
+
     if (!snap.exists()) {
         data = {
             uid: user.uid,
             email: user.email,
             plan: "trial",
-            trialStartMs: Date.now(),
+            trialStartMs: localStart,
             createdAt: serverTimestamp()
         };
         await setDoc(userRef, data);
     } else {
         data = snap.data();
+        if (data.trialStartMs) {
+            localStorage.setItem("smartqr_trial_start_ms", String(data.trialStartMs));
+        }
     }
 
     const isMasterAdmin = user.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
-    const elapsedDays = Math.floor((Date.now() - (data.trialStartMs || Date.now())) / (1000 * 60 * 60 * 24));
-    const daysLeft = Math.max(0, FREE_TRIAL_DAYS - elapsedDays);
     const isPro = data.plan === "pro" || isMasterAdmin;
-    const isExpired = !isPro && daysLeft <= 0;
+    const startMs = data.trialStartMs || localStart;
+    const isExpired = !isPro && (Date.now() >= startMs + FREE_TRIAL_DAYS * 86400000);
 
-    currentUserData = { ...data, daysLeft, isPro, isExpired };
-
-    const planBadge = document.getElementById("planBadge");
-    const trialBox = document.getElementById("trialCountdownBox");
-    const trialDaysText = document.getElementById("trialDaysText");
-
-    if (isMasterAdmin) {
-        planBadge.textContent = "👑 ADMIN";
-        planBadge.className = "text-[11px] font-extrabold bg-slate-900 text-amber-400 px-2.5 py-1 rounded-full";
-        trialBox.classList.add("hidden");
-    } else if (isPro) {
-        planBadge.textContent = "✨ PRO PLAN";
-        planBadge.className = "text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full";
-        trialBox.classList.add("hidden");
-    } else if (isExpired) {
-        planBadge.textContent = "⚠️ Trial Ended";
-        planBadge.className = "text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full";
-        trialBox.classList.remove("hidden");
-        trialDaysText.textContent = "14-Day Trial Expired! Upgrade ₹499";
-    } else {
-        planBadge.textContent = `⏳ ${daysLeft}d Trial`;
-        planBadge.className = "text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full";
-        trialBox.classList.remove("hidden");
-        trialDaysText.textContent = `Free trial ends in ${daysLeft} days`;
-    }
+    currentUserData = { ...data, trialStartMs: startMs, isPro, isExpired };
+    startLiveTrialCountdown();
+    updateQuotaBadgesUI();
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -326,12 +469,14 @@ onAuthStateChanged(auth, async (user) => {
         guestBtns?.classList.remove("hidden");
         userFooter?.classList.add("hidden");
         adminLink?.classList.add("hidden");
+        startLiveTrialCountdown();
+        updateQuotaBadgesUI();
     }
     handleRoute();
 });
 
 // =========================================================
-// 3. NORMAL VS DYNAMIC QR GENERATION & SAVING
+// 4. NORMAL & DYNAMIC QR GENERATOR + SHORT-LINK SAVER
 // =========================================================
 window.toggleDynamicMode = function(enableDyn) {
     isDynamicMode = enableDyn;
@@ -342,12 +487,36 @@ window.toggleDynamicMode = function(enableDyn) {
     if (enableDyn) {
         btnDyn.className = "flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-xs transition";
         btnStatic.className = "flex-1 py-2.5 rounded-xl text-xs font-extrabold text-slate-600 hover:text-slate-900 transition";
-        titleBox.classList.remove("hidden");
+        titleBox?.classList.remove("hidden");
     } else {
         btnStatic.className = "flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-white text-blue-600 shadow-xs transition";
         btnDyn.className = "flex-1 py-2.5 rounded-xl text-xs font-extrabold text-slate-600 hover:text-slate-900 transition";
-        titleBox.classList.add("hidden");
+        titleBox?.classList.add("hidden");
     }
+};
+
+// Reusable Helper so Visiting Cards & Social Hubs also create Tiny 5-Char Short Links!
+window.saveShortDynamicRecord = async function(shortId, recordData) {
+    if (!currentUser) return null;
+    const basePath = window.location.origin + window.location.pathname.replace("index.html", "");
+    const redirectUrl = `${basePath}r.html?id=${shortId}`;
+
+    await setDoc(doc(db, "qrcodes", shortId), {
+        shortId: shortId,
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        scans: recordData.scans || 0,
+        active: true,
+        analytics: recordData.analytics || {
+            devices: { Android: 0, iPhone: 0, Desktop: 0 },
+            timeOfDay: { Morning: 0, Afternoon: 0, Evening: 0, Night: 0 }
+        },
+        createdAt: serverTimestamp(),
+        ...recordData
+    }, { merge: true });
+
+    updateSidebarQrCounts();
+    return redirectUrl;
 };
 
 document.getElementById("generateBtn")?.addEventListener("click", async () => {
@@ -358,83 +527,74 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
     const title = document.getElementById("qrTitle")?.value.trim() || `My ${qrType.toUpperCase()} QR`;
     const shortLinkDisplay = document.getElementById("shortLinkDisplay");
 
-    // CASE 1: NORMAL / STATIC QR (Free Forever)
+    // CASE 1: NORMAL QR (If payload is long like Social Hub, warn or render cleanly)
     if (!isDynamicMode) {
         shortLinkDisplay.classList.add("hidden");
         await window.renderCustomQrToCanvas(payload, customCfg);
-        alert("✅ Custom QR Code Ready! Neeche 'Download HD PNG' par click karke save kar lein.");
+        alert("✅ Designer QR Ready! Neeche 'Download HD PNG' button se save kar lein.");
         return;
     }
 
-    // CASE 2: DYNAMIC TRACKABLE & EDITABLE QR
+    // CASE 2: DYNAMIC SHORT-LINK QR (Makes QR Dots Huge & Fast-Scanning + Editable!)
     if (!currentUser) {
         window.openTrialModal();
         return;
     }
 
-    if (currentUserData && currentUserData.isExpired) {
-        alert("⚠️ Aapka 14-Day Free Trial khatam ho gaya hai! Dynamic QR banane ke liye ₹499.00 Pro Plan upgrade karein.");
+    if (window.isUserTrialExpired()) {
+        alert("⏰ Aapka 14-Day Free Trial khatam ho gaya hai! Dynamic QR banane ke liye ₹499.00 Pro Plan upgrade karein.");
         window.location.hash = "#pricing";
         return;
     }
 
+    // Check Strict Trial Limit (Max 3 Dynamic QRs in Free Trial)
+    if (!window.isUserProPlan()) {
+        const qCheck = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
+        const snapCheck = await getDocs(qCheck);
+        if (snapCheck.size >= TRIAL_LIMITS.dynamicQr) {
+            alert(`⚠️ Free Trial Limit Reached!\n\nFree Trial me maximum ${TRIAL_LIMITS.dynamicQr} Dynamic QR codes allowed hain.\nUnlimited Dynamic QRs ke liye ₹499.00 Pro Plan activate karein!`);
+            window.location.hash = "#pricing";
+            return;
+        }
+        if (!window.checkAndConsumeTrialQuota("dynamicQr")) return;
+    }
+
     const btn = document.getElementById("generateBtn");
     btn.disabled = true;
-    btn.innerHTML = `<span>Saving Dynamic QR...</span>`;
+    btn.innerHTML = `<span>⏳ Creating Fast Short-Link QR...</span>`;
 
     try {
-        if (currentUserData && !currentUserData.isPro) {
-            const qCheck = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
-            const snapCheck = await getDocs(qCheck);
-            if (snapCheck.size >= 5) {
-                alert("⚠️ Free Trial me 5 Dynamic QR codes allowed hain. Unlimited banane ke liye ₹499.00 Pro Plan upgrade karein!");
-                window.location.hash = "#pricing";
-                return;
-            }
-        }
-
-        const shortId = Math.random().toString(36).substring(2, 8);
-        const basePath = window.location.origin + window.location.pathname.replace("index.html", "");
-        const redirectUrl = `${basePath}r.html?id=${shortId}`;
-
-        await setDoc(doc(db, "qrcodes", shortId), {
-            shortId: shortId,
+        const shortId = Math.random().toString(36).substring(2, 7); // 5-char ultra-short ID!
+        const redirectUrl = await window.saveShortDynamicRecord(shortId, {
             title: title,
             qrType: qrType,
             targetUrl: payload,
-            structuredData: structuredDetails, // Saves UPI, VCard, WiFi fields for future multi-type editing!
-            userId: currentUser.uid,
-            userEmail: currentUser.email,
+            structuredData: structuredDetails,
+            themeKey: customCfg.themeKey || "elegant",
             frameId: customCfg.frameId || 1,
             frameText: customCfg.frameText || "Scan Me",
-            textColor: customCfg.textColor || "#000000",
-            fgColor: customCfg.fgColor || "#000000",
+            textColor: customCfg.textColor || "#0f172a",
+            fgColor: customCfg.fgColor || "#0f172a",
+            gradColor2: customCfg.gradColor2 || "#2563eb",
             bgColor: customCfg.bgColor || "#ffffff",
-            dotStyle: customCfg.dotStyle || "square",
-            scans: 0,
-            active: true,
-            analytics: {
-                devices: { Android: 0, iPhone: 0, Desktop: 0 },
-                timeOfDay: { Morning: 0, Afternoon: 0, Evening: 0, Night: 0 }
-            },
-            createdAt: serverTimestamp()
+            dotStyle: customCfg.dotStyle || "classy-rounded"
         });
 
+        // Render the SHORT redirectUrl into the QR -> Produces BIG, CLEAN, INSTANT-SCAN DOTS!
         await window.renderCustomQrToCanvas(redirectUrl, customCfg);
         shortLinkDisplay.textContent = `Tracking Link: ${redirectUrl}`;
         shortLinkDisplay.classList.remove("hidden");
-        updateSidebarQrCounts();
-        alert("🎉 Dynamic QR Created! Ab aap 'User Dashboard' me jaakar kabhi bhi iska Type (Website se UPI, VCard, WiFi) badal sakte hain!");
+        alert("🎉 Dynamic Short-Link QR Saved! Kyunki iska link chhota hai, ye 0.05 second me fast scan hoga aur aap 'User Dashboard' se iska Type kabhi bhi badal sakte hain!");
     } catch (err) {
         alert("Error saving Dynamic QR: " + err.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<span>Generate QR Code</span><span>❯</span>`;
+        btn.innerHTML = `<span>⚡ Generate & Save QR Code</span>`;
     }
 });
 
 // =========================================================
-// 4. USER DASHBOARD & MULTI-TYPE DYNAMIC QR EDITOR
+// 5. USER DASHBOARD & MULTI-TYPE DYNAMIC QR EDITOR
 // =========================================================
 async function updateSidebarQrCounts() {
     if (!currentUser) return;
@@ -456,10 +616,11 @@ async function updateSidebarQrCounts() {
 function getReadableTargetSummary(d) {
     const type = d.qrType || "url";
     const s = d.structuredData || {};
-    if (type === "upi") return `UPI ID: ${s.upiId || d.targetUrl} (${s.upiName || "Merchant"}) ${s.upiAmount ? "₹" + s.upiAmount : ""}`;
-    if (type === "vcard") return `VCard: ${s.vcName || "Contact"} (${s.vcPhone || ""}) - ${s.vcOrg || ""}`;
-    if (type === "wifi") return `Wi-Fi SSID: ${s.wifiSsid || "Network"} (${s.wifiEnc || "WPA"})`;
-    if (type === "social") return `Social Hub: ${s.socTitle || "Link-in-Bio"}`;
+    if (type === "upi") return `UPI: ${s.upiId || ""} (${s.upiName || "Merchant"}) ${s.upiAmount ? "₹" + s.upiAmount : ""}`;
+    if (type === "vcard") return `VCard: ${s.vcName || ""} (${s.vcPhone || ""})`;
+    if (type === "visiting") return `Visiting Card: ${s.shopName || d.title} (${s.shopPhone || ""})`;
+    if (type === "wifi") return `Wi-Fi: ${s.wifiSsid || ""} (${s.wifiEnc || "WPA"})`;
+    if (type === "social") return `Social Hub: ${s.socTitle || d.title}`;
     return d.targetUrl;
 }
 
@@ -483,18 +644,18 @@ async function loadUserDashboard() {
 
             const shortUrl = `${basePath}r.html?id=${d.shortId}`;
             const summaryText = getReadableTargetSummary(d);
-            const safeFrameText = (d.frameText || d.bottomText || "Scan Me").replace(/'/g, "");
+            const safeFrameText = (d.frameText || "Scan Me").replace(/'/g, "");
 
             html += `
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row justify-between gap-3">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row justify-between gap-3">
                     <div class="space-y-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="w-2.5 h-2.5 rounded-full ${d.active ? 'bg-emerald-500' : 'bg-red-500'}"></span>
                             <h3 class="font-extrabold text-sm text-slate-900">${d.title}</h3>
                             <span class="text-[10px] uppercase bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-extrabold">${d.qrType || 'url'}</span>
                         </div>
-                        <p class="text-xs text-slate-600 break-all">Current Data: <strong class="text-emerald-700">${summaryText}</strong></p>
-                        <p class="text-[11px] text-slate-400 font-mono break-all">QR Short Link: ${shortUrl}</p>
+                        <p class="text-xs text-slate-600 break-all">Active Target: <strong class="text-emerald-700">${summaryText}</strong></p>
+                        <p class="text-[11px] text-slate-400 font-mono break-all">Short Link: <a href="${shortUrl}" target="_blank" class="underline hover:text-blue-600">${shortUrl}</a></p>
                     </div>
 
                     <div class="flex sm:flex-col justify-between items-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0">
@@ -508,7 +669,7 @@ async function loadUserDashboard() {
                             <button onclick="toggleCustomerQr('${d.shortId}', ${d.active})" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1.5 rounded-xl font-bold">
                                 ${d.active ? '⏸️ Pause' : '▶️ Resume'}
                             </button>
-                            <button onclick="downloadSavedCustomQR('${shortUrl}', '${d.fgColor || '#000000'}', '${d.bgColor || '#ffffff'}', '${d.dotStyle || 'square'}', '${safeFrameText}', '${d.shortId}', ${d.frameId || 1}, '${d.textColor || '#000000'}')" class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-xl font-bold">
+                            <button onclick="downloadSavedCustomQR('${shortUrl}', '${d.fgColor || '#0f172a'}', '${d.bgColor || '#ffffff'}', '${d.dotStyle || 'classy-rounded'}', '${safeFrameText}', '${d.shortId}', ${d.frameId || 1}, '${d.textColor || '#0f172a'}', '${d.gradColor2 || '#2563eb'}')" class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-xl font-bold">
                                 📥 PNG
                             </button>
                             <button onclick="deleteCustomerQr('${d.shortId}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl font-bold">
@@ -532,9 +693,8 @@ async function loadUserDashboard() {
     }
 }
 
-// Switch Input Boxes Inside Edit Modal When User Changes QR Type (URL <-> UPI <-> VCard <-> WiFi <-> Social)
 window.switchEditModalType = function(type) {
-    ["edit-box-single", "edit-box-upi", "edit-box-vcard", "edit-box-wifi", "edit-box-social"].forEach(id => {
+    ["edit-box-single", "edit-box-upi", "edit-box-vcard", "edit-box-visiting", "edit-box-wifi", "edit-box-social"].forEach(id => {
         document.getElementById(id)?.classList.add("hidden");
     });
 
@@ -545,6 +705,8 @@ window.switchEditModalType = function(type) {
         document.getElementById("edit-box-upi")?.classList.remove("hidden");
     } else if (type === "vcard") {
         document.getElementById("edit-box-vcard")?.classList.remove("hidden");
+    } else if (type === "visiting") {
+        document.getElementById("edit-box-visiting")?.classList.remove("hidden");
     } else if (type === "wifi") {
         document.getElementById("edit-box-wifi")?.classList.remove("hidden");
     } else if (type === "social") {
@@ -562,15 +724,14 @@ window.switchEditModalType = function(type) {
             singleInput.placeholder = "+919876543210";
         } else if (type === "text") {
             singleLabel.textContent = "Enter New Plain Text / Message";
-            singleInput.placeholder = "Write any message or notice...";
+            singleInput.placeholder = "Type message or notice...";
         }
     }
 };
 
-// Open Edit Modal & Populate Existing Data
 window.openEditQrModal = function(shortId) {
-    if (currentUserData && currentUserData.isExpired) {
-        alert("⚠️ 14-Day Trial Expired! Dynamic QR edit karne ke liye ₹499.00 Pro Plan activate karein.");
+    if (window.isUserTrialExpired()) {
+        alert("⏰ 14-Day Trial Expired! Dynamic QR edit karne ke liye ₹499.00 Pro Plan activate karein.");
         window.location.hash = "#pricing";
         return;
     }
@@ -585,15 +746,12 @@ window.openEditQrModal = function(shortId) {
     document.getElementById("editQrTitle").value = d.title || "";
     document.getElementById("editQrTypeSelect").value = type;
 
-    // Populate Single Input
     document.getElementById("editSingleInput").value = s.rawSingle || d.targetUrl || "";
 
-    // Populate UPI Fields
     document.getElementById("editUpiId").value = s.upiId || "";
     document.getElementById("editUpiName").value = s.upiName || "";
     document.getElementById("editUpiAmount").value = s.upiAmount || "";
 
-    // Populate VCard Fields
     document.getElementById("editVcName").value = s.vcName || "";
     document.getElementById("editVcPhone").value = s.vcPhone || "";
     document.getElementById("editVcEmail").value = s.vcEmail || "";
@@ -601,12 +759,15 @@ window.openEditQrModal = function(shortId) {
     document.getElementById("editVcWeb").value = s.vcWeb || "";
     document.getElementById("editVcAddr").value = s.vcAddr || "";
 
-    // Populate WiFi Fields
+    document.getElementById("editShopName").value = s.shopName || "";
+    document.getElementById("editShopPhone").value = s.shopPhone || "";
+    document.getElementById("editShopAddr").value = s.shopAddr || "";
+    document.getElementById("editShopItems").value = s.shopItems || "";
+
     document.getElementById("editWifiSsid").value = s.wifiSsid || "";
     document.getElementById("editWifiPass").value = s.wifiPass || "";
     document.getElementById("editWifiEnc").value = s.wifiEnc || "WPA";
 
-    // Populate Social Hub Fields
     document.getElementById("editSocTitle").value = s.socTitle || "";
     document.getElementById("editSocInsta").value = s.socInsta || "";
     document.getElementById("editSocYt").value = s.socYt || "";
@@ -617,7 +778,6 @@ window.openEditQrModal = function(shortId) {
     window.location.hash = "#edit";
 };
 
-// Save Edited Type & New Destination to Firestore
 document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
     const id = document.getElementById("editQrId").value;
     const title = document.getElementById("editQrTitle").value.trim() || "Updated QR";
@@ -635,6 +795,10 @@ document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
         vcOrg: document.getElementById("editVcOrg").value.trim(),
         vcWeb: document.getElementById("editVcWeb").value.trim(),
         vcAddr: document.getElementById("editVcAddr").value.trim(),
+        shopName: document.getElementById("editShopName").value.trim(),
+        shopPhone: document.getElementById("editShopPhone").value.trim(),
+        shopAddr: document.getElementById("editShopAddr").value.trim(),
+        shopItems: document.getElementById("editShopItems").value.trim(),
         wifiSsid: document.getElementById("editWifiSsid").value.trim(),
         wifiPass: document.getElementById("editWifiPass").value.trim(),
         wifiEnc: document.getElementById("editWifiEnc").value,
@@ -654,12 +818,9 @@ document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
         }
     } 
     else if (newType === "vcard") {
-        if (!newStructured.vcName || !newStructured.vcPhone) {
-            return alert("VCard ke liye Full Name aur Mobile Number zaroori hai!");
-        }
+        if (!newStructured.vcName || !newStructured.vcPhone) return alert("Full Name aur Mobile Number zaroori hai!");
         finalPayload = [
-            "BEGIN:VCARD",
-            "VERSION:3.0",
+            "BEGIN:VCARD", "VERSION:3.0",
             `FN:${newStructured.vcName}`,
             newStructured.vcOrg ? `ORG:${newStructured.vcOrg}` : "",
             `TEL;TYPE=CELL:${newStructured.vcPhone}`,
@@ -669,40 +830,32 @@ document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
             "END:VCARD"
         ].filter(Boolean).join("\n");
     } 
+    else if (newType === "visiting") {
+        if (!newStructured.shopName || !newStructured.shopPhone) return alert("Shop Name aur Phone Number zaroori hai!");
+        finalPayload = `VISITING_CARD:${id}`;
+    } 
     else if (newType === "wifi") {
-        if (!newStructured.wifiSsid) return alert("Kripya Wi-Fi SSID (Network Name) enter karein!");
+        if (!newStructured.wifiSsid) return alert("Wi-Fi SSID enter karein!");
         finalPayload = `WIFI:T:${newStructured.wifiEnc};S:${newStructured.wifiSsid};P:${newStructured.wifiPass};;`;
     } 
     else if (newType === "social") {
-        const hubObj = {
-            t: newStructured.socTitle || title,
-            ig: newStructured.socInsta,
-            yt: newStructured.socYt,
-            wa: newStructured.socWa,
-            wb: newStructured.socWeb
-        };
-        const encoded = btoa(encodeURIComponent(JSON.stringify(hubObj)));
-        const basePath = window.location.origin + window.location.pathname.replace("index.html", "");
-        finalPayload = `${basePath}r.html?hub=${encoded}`;
+        finalPayload = `SOCIAL_HUB:${id}`;
     } 
     else if (newType === "whatsapp") {
-        if (!newStructured.rawSingle) return alert("Kripya WhatsApp number dalein!");
+        if (!newStructured.rawSingle) return alert("WhatsApp number dalein!");
         finalPayload = `https://wa.me/${newStructured.rawSingle.replace(/\D/g, "")}`;
     } 
     else if (newType === "phone") {
-        if (!newStructured.rawSingle) return alert("Kripya Phone number dalein!");
+        if (!newStructured.rawSingle) return alert("Phone number dalein!");
         finalPayload = `tel:${newStructured.rawSingle.replace(/[^\d+]/g, "")}`;
     } 
     else if (newType === "text") {
-        if (!newStructured.rawSingle) return alert("Kripya Text enter karein!");
+        if (!newStructured.rawSingle) return alert("Text enter karein!");
         finalPayload = newStructured.rawSingle;
     } 
     else {
-        // Website URL
-        if (!newStructured.rawSingle) return alert("Kripya Website URL enter karein!");
-        finalPayload = /^https?:\/\//i.test(newStructured.rawSingle)
-            ? newStructured.rawSingle
-            : `https://${newStructured.rawSingle}`;
+        if (!newStructured.rawSingle) return alert("Website URL enter karein!");
+        finalPayload = /^https?:\/\//i.test(newStructured.rawSingle) ? newStructured.rawSingle : `https://${newStructured.rawSingle}`;
     }
 
     const btn = document.getElementById("saveEditBtn");
@@ -716,10 +869,10 @@ document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
             targetUrl: finalPayload,
             structuredData: newStructured
         });
-        alert(`✅ Success! Aapka QR ab '${newType.toUpperCase()}' me convert ho gaya hai bina QR badle!`);
+        alert(`✅ Updated! Aapka QR ab '${newType.toUpperCase()}' par set ho gaya hai!`);
         window.history.back();
     } catch (err) {
-        alert("Update failed: " + err.message);
+        alert("Update Error: " + err.message);
     } finally {
         btn.disabled = false;
         btn.textContent = "✅ Save & Update QR";
@@ -728,12 +881,8 @@ document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
 
 window.deleteCustomerQr = async function(shortId) {
     if (!confirm("Kya aap sach me is Dynamic QR Code ko Delete karna chahte hain?")) return;
-    try {
-        await deleteDoc(doc(db, "qrcodes", shortId));
-        loadUserDashboard();
-    } catch (err) {
-        alert("Delete Error: " + err.message);
-    }
+    await deleteDoc(doc(db, "qrcodes", shortId));
+    loadUserDashboard();
 };
 
 window.toggleCustomerQr = async function(shortId, currentStatus) {
@@ -742,7 +891,7 @@ window.toggleCustomerQr = async function(shortId, currentStatus) {
 };
 
 // =========================================================
-// 5. ANALYTICS & CSV EXPORT
+// 6. ANALYTICS & CSV EXPORT
 // =========================================================
 async function loadCustomerAnalytics() {
     const q = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
@@ -791,20 +940,21 @@ async function loadCustomerAnalytics() {
 }
 
 window.exportAnalyticsCSV = function() {
-    if (!cachedUserQRs.length) return alert("Export karne ke liye koi QR data nahi hai!");
-    let csv = "ShortID,CampaignTitle,QRType,TotalScans,Status\n";
+    if (!cachedUserQRs.length) return alert("Export karne ke liye koi Dynamic QR data nahi hai!");
+    let csv = "ShortID,Title,QRType,TargetSummary,TotalScans,Status\n";
     cachedUserQRs.forEach(q => {
-        csv += `"${q.shortId}","${q.title}","${q.qrType || 'url'}",${q.scans || 0},${q.active ? "Active" : "Paused"}\n`;
+        const summary = getReadableTargetSummary(q).replace(/"/g, '""');
+        csv += `"${q.shortId}","${(q.title || "").replace(/"/g, '""')}","${q.qrType || 'url'}","${summary}",${q.scans || 0},"${q.active ? "Active" : "Paused"}"\n`;
     });
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `QR-Analytics-${Date.now()}.csv`;
+    link.download = `Dynamic-QRs-Report-${Date.now()}.csv`;
     link.click();
 };
 
 // =========================================================
-// 6. ₹499.00 UPI PAYMENT GATEWAY (9661692365@ybl)
+// 7. ₹499.00 UPI PAYMENT GATEWAY & MASTER ADMIN PANEL
 // =========================================================
 function getOfficialUpiUri() {
     return `upi://pay?pa=${ADMIN_UPI_ID}&pn=${encodeURIComponent(ADMIN_MERCHANT_NAME)}&am=${PRO_PLAN_PRICE}&cu=INR&tn=${encodeURIComponent("SmartQR Pro Plan")}`;
@@ -816,10 +966,7 @@ async function renderUpiPaymentGatewayQR() {
     if (!canvas) return;
 
     const upiStyler = new QRCodeStyling({
-        width: 240,
-        height: 240,
-        data: upiUri,
-        margin: 12,
+        width: 240, height: 240, data: upiUri, margin: 12,
         qrOptions: { errorCorrectionLevel: "M" },
         dotsOptions: { color: "#000000", type: "square" },
         backgroundOptions: { color: "#ffffff" }
@@ -837,16 +984,14 @@ async function renderUpiPaymentGatewayQR() {
     img.src = url;
 }
 
-window.triggerUpiAppOpen = function() {
-    window.location.href = getOfficialUpiUri();
-};
+window.triggerUpiAppOpen = () => { window.location.href = getOfficialUpiUri(); };
 
-window.copyMerchantUpi = function() {
+window.copyMerchantUpi = () => {
     navigator.clipboard.writeText(ADMIN_UPI_ID);
-    alert(`✅ UPI ID Copied: ${ADMIN_UPI_ID}\nAb aap ₹499.00 pay karke UTR submit kar sakte hain!`);
+    alert(`✅ Copied: ${ADMIN_UPI_ID}`);
 };
 
-window.downloadUpiPaymentQr = function() {
+window.downloadUpiPaymentQr = () => {
     const canvas = document.getElementById("upiQrCanvas");
     const a = document.createElement("a");
     a.download = "Pay-499-SmartQR-Pro.png";
@@ -856,10 +1001,7 @@ window.downloadUpiPaymentQr = function() {
 
 document.getElementById("submitUpiBtn")?.addEventListener("click", async () => {
     const utr = document.getElementById("upiUtrInput").value.trim();
-    if (utr.length < 8) {
-        alert("Kripya sahi 12-digit UTR / Reference Number enter karein!");
-        return;
-    }
+    if (utr.length < 8) return alert("Kripya 12-digit UTR / Reference Number enter karein!");
 
     const btn = document.getElementById("submitUpiBtn");
     btn.disabled = true;
@@ -879,7 +1021,7 @@ document.getElementById("submitUpiBtn")?.addEventListener("click", async () => {
         });
 
         document.getElementById("upiUtrInput").value = "";
-        alert("✅ ₹499.00 Payment UTR Submitted! Admin verify karke aapka Pro Plan activate kar denge.");
+        alert("✅ ₹499.00 Payment UTR Submitted! Admin verify karke aapka Unlimited Pro Plan activate kar denge.");
         window.history.back();
     } catch (err) {
         alert("Submission Error: " + err.message);
@@ -889,9 +1031,6 @@ document.getElementById("submitUpiBtn")?.addEventListener("click", async () => {
     }
 });
 
-// =========================================================
-// 7. MASTER ADMIN CONTROL PANEL
-// =========================================================
 async function loadMasterAdminPanel() {
     const payBox = document.getElementById("adminPaymentList");
     const usersBox = document.getElementById("adminUsersList");
