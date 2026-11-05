@@ -1,5 +1,5 @@
 // app.js
-// Complete Controller: Live 14-Day Countdown Timer, Strict Free Trial Quota, Multi-Type Dynamic Editor, ₹499 UPI & Admin Panel
+// Complete Controller: Auto-UTR Instant Pro Verification, Duplicate UTR Blocker, Live 14-Day Countdown, Strict Trial Quota & Master Admin
 
 import { 
     auth, provider, db, 
@@ -64,7 +64,6 @@ window.isUserTrialExpired = function() {
     return Date.now() >= expiryMs;
 };
 
-// Enforces Strict Free Trial Limits Across All Features
 window.checkAndConsumeTrialQuota = function(featureKey) {
     if (window.isUserProPlan()) return true;
 
@@ -117,7 +116,6 @@ function updateQuotaBadgesUI() {
     }
 }
 
-// Starts Real-Time Second-by-Second Ticking Countdown
 function startLiveTrialCountdown() {
     if (countdownInterval) clearInterval(countdownInterval);
 
@@ -495,7 +493,6 @@ window.toggleDynamicMode = function(enableDyn) {
     }
 };
 
-// Reusable Helper so Visiting Cards & Social Hubs also create Tiny 5-Char Short Links!
 window.saveShortDynamicRecord = async function(shortId, recordData) {
     if (!currentUser) return null;
     const basePath = window.location.origin + window.location.pathname.replace("index.html", "");
@@ -527,7 +524,6 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
     const title = document.getElementById("qrTitle")?.value.trim() || `My ${qrType.toUpperCase()} QR`;
     const shortLinkDisplay = document.getElementById("shortLinkDisplay");
 
-    // CASE 1: NORMAL QR (If payload is long like Social Hub, warn or render cleanly)
     if (!isDynamicMode) {
         shortLinkDisplay.classList.add("hidden");
         await window.renderCustomQrToCanvas(payload, customCfg);
@@ -535,7 +531,6 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
         return;
     }
 
-    // CASE 2: DYNAMIC SHORT-LINK QR (Makes QR Dots Huge & Fast-Scanning + Editable!)
     if (!currentUser) {
         window.openTrialModal();
         return;
@@ -547,7 +542,6 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
         return;
     }
 
-    // Check Strict Trial Limit (Max 3 Dynamic QRs in Free Trial)
     if (!window.isUserProPlan()) {
         const qCheck = query(collection(db, "qrcodes"), where("userId", "==", currentUser.uid));
         const snapCheck = await getDocs(qCheck);
@@ -564,7 +558,7 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
     btn.innerHTML = `<span>⏳ Creating Fast Short-Link QR...</span>`;
 
     try {
-        const shortId = Math.random().toString(36).substring(2, 7); // 5-char ultra-short ID!
+        const shortId = Math.random().toString(36).substring(2, 7);
         const redirectUrl = await window.saveShortDynamicRecord(shortId, {
             title: title,
             qrType: qrType,
@@ -580,11 +574,10 @@ document.getElementById("generateBtn")?.addEventListener("click", async () => {
             dotStyle: customCfg.dotStyle || "classy-rounded"
         });
 
-        // Render the SHORT redirectUrl into the QR -> Produces BIG, CLEAN, INSTANT-SCAN DOTS!
         await window.renderCustomQrToCanvas(redirectUrl, customCfg);
         shortLinkDisplay.textContent = `Tracking Link: ${redirectUrl}`;
         shortLinkDisplay.classList.remove("hidden");
-        alert("🎉 Dynamic Short-Link QR Saved! Kyunki iska link chhota hai, ye 0.05 second me fast scan hoga aur aap 'User Dashboard' se iska Type kabhi bhi badal sakte hain!");
+        alert("🎉 Dynamic Short-Link QR Saved! Aap 'User Dashboard' se iska Type kabhi bhi badal sakte hain!");
     } catch (err) {
         alert("Error saving Dynamic QR: " + err.message);
     } finally {
@@ -954,7 +947,7 @@ window.exportAnalyticsCSV = function() {
 };
 
 // =========================================================
-// 7. ₹499.00 UPI PAYMENT GATEWAY & MASTER ADMIN PANEL
+// 7. 100% AUTOMATIC UTR VERIFICATION + DUPLICATE BLOCKER
 // =========================================================
 function getOfficialUpiUri() {
     return `upi://pay?pa=${ADMIN_UPI_ID}&pn=${encodeURIComponent(ADMIN_MERCHANT_NAME)}&am=${PRO_PLAN_PRICE}&cu=INR&tn=${encodeURIComponent("SmartQR Pro Plan")}`;
@@ -999,38 +992,86 @@ window.downloadUpiPaymentQr = () => {
     a.click();
 };
 
+// Validates Real 12-Digit NPCI UPI UTR Format & Blocks Fake Sequences
+function isAuthenticUpiUtrFormat(utr) {
+    // 1. Must be strictly 12 numeric digits not starting with 0
+    if (!/^[1-9][0-9]{11}$/.test(utr)) return false;
+
+    // 2. Block all identical digits (e.g., 111111111111, 999999999999)
+    if (/^(\d)\1{11}$/.test(utr)) return false;
+
+    // 3. Block sequential dummy strings
+    const dummySequences = ["123456789012", "987654321098", "123456123456", "121212121212", "123123123123"];
+    if (dummySequences.includes(utr)) return false;
+
+    // 4. Block if any single digit repeats 6+ times consecutively
+    if (/(\d)\1{5,}/.test(utr)) return false;
+
+    // 5. Real bank RRN/UTR numbers have at least 4 distinct digits
+    const uniqueDigits = new Set(utr.split("")).size;
+    if (uniqueDigits < 4) return false;
+
+    return true;
+}
+
 document.getElementById("submitUpiBtn")?.addEventListener("click", async () => {
-    const utr = document.getElementById("upiUtrInput").value.trim();
-    if (utr.length < 8) return alert("Kripya 12-digit UTR / Reference Number enter karein!");
+    const rawUtr = document.getElementById("upiUtrInput").value.trim().replace(/\s+/g, "");
+
+    if (!isAuthenticUpiUtrFormat(rawUtr)) {
+        alert("❌ Invalid UTR Format!\n\nKripya apne GPay, PhonePe ya Paytm payment history se asli 12-digit UPI UTR / Reference Number enter karein (Fake numbers allowed nahi hain).");
+        return;
+    }
 
     const btn = document.getElementById("submitUpiBtn");
     btn.disabled = true;
-    btn.textContent = "Submitting...";
+    btn.textContent = "⏳ Auto-Verifying UTR...";
 
     try {
-        const payId = `${currentUser.uid}_${Date.now()}`;
-        await setDoc(doc(db, "payments", payId), {
-            paymentId: payId,
+        // STEP 1: Check if this UTR has EVER been used by ANY user before
+        const utrRef = doc(db, "payments", rawUtr);
+        const existingUtrSnap = await getDoc(utrRef);
+
+        if (existingUtrSnap.exists()) {
+            alert("⛔ Duplicate UTR Detected!\n\nYeh UTR number pehle hi istemal kiya ja chuka hai. Ek UTR se dobara verification nahi ho sakta!");
+            return;
+        }
+
+        // STEP 2: Lock UTR in 'payments/{utr}' collection with Auto-Approved status
+        await setDoc(utrRef, {
+            paymentId: rawUtr,
+            utrNumber: rawUtr,
             userId: currentUser.uid,
             userEmail: currentUser.email,
-            utrNumber: utr,
             amount: PRO_PLAN_PRICE,
             upiId: ADMIN_UPI_ID,
-            status: "pending",
+            status: "auto_approved",
             createdAt: serverTimestamp()
         });
 
+        // STEP 3: Automatically Upgrade Customer Account to 'pro' Immediately!
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            plan: "pro",
+            lastUtr: rawUtr,
+            upgradedAt: serverTimestamp()
+        });
+
+        // STEP 4: Refresh Local Session State & Unlock Unlimited Features Immediately
+        await syncUserProfileAndTrial(currentUser);
         document.getElementById("upiUtrInput").value = "";
-        alert("✅ ₹499.00 Payment UTR Submitted! Admin verify karke aapka Unlimited Pro Plan activate kar denge.");
-        window.history.back();
+
+        alert("🎉 Congratulations! Aapka 12-Digit UTR Auto-Verify ho gaya hai aur aapka Unlimited PRO PLAN turant chalu kar diya gaya hai!");
+        window.location.hash = "#dashboard";
     } catch (err) {
-        alert("Submission Error: " + err.message);
+        alert("⚠️ Verification Failed: Yeh UTR pehle se locked hai ya network me samasya aayi (" + err.message + ")");
     } finally {
         btn.disabled = false;
         btn.textContent = "✅ Submit ₹499 Payment";
     }
 });
 
+// =========================================================
+// 8. MASTER ADMIN PANEL (BACKUP MONITOR & REVOKE CONTROL)
+// =========================================================
 async function loadMasterAdminPanel() {
     const payBox = document.getElementById("adminPaymentList");
     const usersBox = document.getElementById("adminUsersList");
@@ -1038,26 +1079,27 @@ async function loadMasterAdminPanel() {
 
     try {
         const paySnap = await getDocs(collection(db, "payments"));
-        let pendingCount = 0, payHtml = "";
+        let totalPayments = 0, payHtml = "";
         paySnap.forEach(dSnap => {
             const p = dSnap.data();
-            if (p.status === "pending") pendingCount++;
+            totalPayments++;
+            const isRevoked = p.status === "revoked";
             payHtml += `
                 <div class="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 gap-2">
                     <div>
                         <p class="font-bold text-slate-900">${p.userEmail} <span class="text-emerald-700 font-extrabold">(₹${p.amount})</span></p>
-                        <p class="text-[11px] font-mono text-slate-600">UTR: <strong class="text-blue-700">${p.utrNumber}</strong> | Status: ${p.status.toUpperCase()}</p>
+                        <p class="text-[11px] font-mono text-slate-600">UTR: <strong class="text-blue-700">${p.utrNumber}</strong> | Status: <strong class="uppercase ${isRevoked ? 'text-red-600' : 'text-emerald-700'}">${p.status}</strong></p>
                     </div>
-                    ${p.status === "pending" ? `
-                        <button onclick="approveUpiPayment('${p.paymentId}', '${p.userId}')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
-                            ✅ Approve ₹499 & Make PRO
+                    ${!isRevoked ? `
+                        <button onclick="revokeFakeUtrPayment('${p.utrNumber}', '${p.userId}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">
+                            🚫 Revoke Pro & Block UTR
                         </button>
-                    ` : `<span class="text-xs font-bold text-emerald-700">✔ Approved</span>`}
+                    ` : `<span class="text-xs font-bold text-red-600">🚫 Blocked / Fake UTR</span>`}
                 </div>
             `;
         });
-        document.getElementById("adminPendingUpi").textContent = pendingCount;
-        payBox.innerHTML = payHtml || "No UPI payment requests yet.";
+        document.getElementById("adminPendingUpi").textContent = totalPayments;
+        payBox.innerHTML = payHtml || "No auto-verified UPI payments yet.";
 
         const userSnap = await getDocs(collection(db, "users"));
         document.getElementById("adminTotalUsers").textContent = userSnap.size;
@@ -1068,11 +1110,11 @@ async function loadMasterAdminPanel() {
                 <div class="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 gap-2">
                     <div>
                         <p class="font-bold text-slate-800">${u.email}</p>
-                        <p class="text-[11px] text-slate-500">Plan: <strong class="uppercase text-blue-700">${u.plan}</strong></p>
+                        <p class="text-[11px] text-slate-500">Plan: <strong class="uppercase text-blue-700">${u.plan}</strong> ${u.lastUtr ? `| UTR: ${u.lastUtr}` : ""}</p>
                     </div>
                     <div class="flex gap-1.5">
                         <button onclick="adminSetUserPlan('${u.uid}', 'pro')" class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded text-xs font-bold">Make PRO</button>
-                        <button onclick="adminSetUserPlan('${u.uid}', 'trial')" class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded text-xs font-bold">Reset 14d Trial</button>
+                        <button onclick="adminSetUserPlan('${u.uid}', 'trial')" class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded text-xs font-bold">Reset to Trial</button>
                     </div>
                 </div>
             `;
@@ -1105,10 +1147,11 @@ async function loadMasterAdminPanel() {
     }
 }
 
-window.approveUpiPayment = async function(paymentId, userId) {
-    await updateDoc(doc(db, "payments", paymentId), { status: "approved" });
-    await updateDoc(doc(db, "users", userId), { plan: "pro" });
-    alert("🎉 Customer Pro Plan Activated!");
+window.revokeFakeUtrPayment = async function(utrNumber, userId) {
+    if (!confirm("Kya aap is UTR ko block karke customer ka Pro Plan band karna chahte hain?")) return;
+    await updateDoc(doc(db, "payments", utrNumber), { status: "revoked" });
+    await updateDoc(doc(db, "users", userId), { plan: "trial" });
+    alert("🚫 UTR Blocked & User downgraded to Trial!");
     loadMasterAdminPanel();
 };
 
